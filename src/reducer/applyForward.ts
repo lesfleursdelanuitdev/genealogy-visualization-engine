@@ -14,5 +14,6 @@ export function applyForward(state: TreeState): TreeState {
     historyIndex,
     rootId: entry.rootId,
     viewState: entry.viewState,
+    strategyName: entry.strategyName ?? state.strategyName ?? "descendancy",
   };
 }

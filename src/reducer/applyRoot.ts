@@ -7,9 +7,25 @@ import { pushHistory } from "./pushHistory";
 import { getStrategyReducer } from "./strategies/registry";
 import { getPersonDisplay } from "./getPersonDisplay";
 
-export function applyRoot(state: TreeState, personId: string): TreeState {
+export function applyRoot(
+  state: TreeState,
+  personId: string,
+  pedigreeFamcFamilyXref?: string | null
+): TreeState {
   const strategy = getStrategyReducer(state.strategyName);
-  const newViewState = strategy?.getInitialViewState() ?? {};
+  const base = strategy?.getInitialViewState() ?? {};
+  const isPed =
+    state.strategyName === "pedigree" ||
+    state.strategyName === "vertical_pedigree" ||
+    state.strategyName === "fan_chart";
+  const famc =
+    isPed && pedigreeFamcFamilyXref != null && String(pedigreeFamcFamilyXref).trim() !== ""
+      ? String(pedigreeFamcFamilyXref).trim()
+      : undefined;
+  const newViewState = {
+    ...base,
+    ...(famc != null ? { pedigreeFamcFamilyXref: famc } : {}),
+  };
   const { fullName, initials } = getPersonDisplay(personId);
   const actionLabel = `Make ${fullName} root`;
   const hist = pushHistory(state, personId, newViewState, actionLabel, undefined, {

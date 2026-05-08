@@ -51,7 +51,7 @@ export function applyShowSiblings(state: TreeState, personId: string): TreeState
   const rootInitials = rootPerson
     ? ((rootPerson.firstName?.trim() || "")[0] ?? "") + ((rootPerson.lastName?.trim() || "")[0] ?? "")
     : "?";
-  const actionLabel = `Show siblings of ${personFullName}`;
+  const actionLabel = `Show parents & siblings of ${personFullName}`;
   const hist = pushHistory(state, newRoot, newViewState, actionLabel, personId, {
     triggerPersonFullName: personFullName,
     triggerPersonInitials: (triggerInitials || "?").toUpperCase(),

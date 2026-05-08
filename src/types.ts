@@ -14,6 +14,10 @@ export interface DescendancyPerson {
   lastName: string;
   birthYear?: number | null;
   deathYear?: number | null;
+  /** Full birth place display (e.g. city, region, country), as from tree API — never truncated. */
+  birthPlace?: string | null;
+  /** Full death / burial place display, as from tree API — never truncated. */
+  deathPlace?: string | null;
   photoUrl?: string | null;
   /** Display gender from data (e.g. "Male", "Female", "Unknown") for default icon. */
   gender?: string | null;
@@ -25,6 +29,8 @@ export interface DescendancyPerson {
   _isLinkedSpouse?: boolean;
   /** True when this card is root-only for layout (sibling catch-all); hide spouses/parents buttons. */
   _onlyRoot?: boolean;
+  /** Pedigree: muted placeholder card for a missing father/mother/parent slot. */
+  _unknownPlaceholder?: boolean;
 }
 
 /** Child entry in a union: id and pedigree (birth, adopted, foster, etc.). */
@@ -47,6 +53,11 @@ export interface LinkedUnionEntry {
   unionId: string;
   bothNewcomers?: boolean;
   husbId?: string;
+  /**
+   * Child context that created this `__xy__*` row (e.g. legacy `PARENTS` / linked-unions). When set, that pair is drawn only under
+   * the scoped union fan-out (not under every revealed-spouse row on the chart).
+   */
+  xyAnchorPersonId?: string;
 }
 
 /** Sibling view state: root shows (X,Y) + catch-alls + (W,V) adoptive unions with colored connectors. */
@@ -55,6 +66,10 @@ export interface SiblingView {
   spouseCatchAlls: string[];
   adoptiveUnions: string[];
   adoptiveCatchAlls: string[];
+  /** Resolved birth father xref (same id space as `people` / chart). When set with `birthMotherPersonId`, legend uses these for the biological-parent line. */
+  birthFatherPersonId?: string | null;
+  /** Resolved birth mother xref. */
+  birthMotherPersonId?: string | null;
 }
 
 /** Chart view state: revealed spouses, linked unions, sibling view, expand-down, pan target. */
@@ -72,4 +87,18 @@ export interface ViewState {
   panToPersonId?: string;
   /** Person IDs whose subtrees are collapsed (descendants hidden). Stored as array for JSON-serializable state. */
   collapsedSubtrees?: string[];
+  /**
+   * Pedigree / vertical pedigree: GEDCOM family xref (`@F…@`) the root is a child of — limits the first generation
+   * of ancestors to that family when the person appears in multiple families as a child.
+   */
+  pedigreeFamcFamilyXref?: string | null;
+  /**
+   * Pedigree / vertical pedigree: per-person chosen child-family (FAMC) for ancestor climbing — keyed by person xref,
+   * values are family xrefs. Used when switching parent family for **non-root** people without re-rooting the chart.
+   */
+  pedigreeFamcOverrides?: Record<string, string>;
+  /**
+   * Pedigree / vertical pedigree: when set, the chart omits ancestors above this person (they render as a leaf).
+   */
+  pedigreeAncestorCollapsePersonId?: string | null;
 }

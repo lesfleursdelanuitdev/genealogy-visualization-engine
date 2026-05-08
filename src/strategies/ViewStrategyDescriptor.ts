@@ -27,6 +27,12 @@ export interface ConnectorHelpers {
 /** Options for layout and bounds when person card height varies by display settings. */
 export interface LayoutBoundsOptions {
   personHeight?: number;
+  /**
+   * Horizontal pedigree (LTR): vertical gap (px) between the bottom of the first parent’s card
+   * and the top of the second parent’s card when the pair is stacked. Center-to-center step is
+   * `personHeight + parentPairGap`. Ignored by other strategies unless they adopt the same option.
+   */
+  parentPairGap?: number;
 }
 
 /** Bounding box of the laid-out tree. */

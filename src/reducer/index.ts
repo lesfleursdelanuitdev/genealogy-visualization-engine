@@ -10,8 +10,14 @@ import { coreHandlers } from "./handlers";
 import { getStrategyReducer } from "./strategies/registry";
 import { createInitialState } from "./initialState";
 import { registerDescendancyReducer } from "./strategies/descendancy";
+import { registerPedigreeReducer } from "./strategies/pedigree";
+import { registerVerticalPedigreeReducer } from "./strategies/verticalPedigree";
+import { registerFanChartReducer } from "./strategies/fanChart";
 
 registerDescendancyReducer();
+registerPedigreeReducer();
+registerVerticalPedigreeReducer();
+registerFanChartReducer();
 
 export const INITIAL_STATE: TreeState = createInitialState("descendancy");
 

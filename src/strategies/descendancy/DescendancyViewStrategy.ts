@@ -13,7 +13,7 @@ import {
   SiblingAdoptiveUnionNode,
   type UnionNode,
 } from "../../nodes";
-import { getUnionById, getUnionsByPerson } from "../../testdata";
+import { getParentUnionsByChild, getUnionById, getUnionsByPerson } from "../../testdata";
 import type { ViewState, LinkedUnionEntry, UnionRecord } from "../../types";
 import type { BuildContext, ViewStrategy } from "../ViewStrategy";
 
@@ -36,6 +36,14 @@ export class DescendancyViewStrategy implements ViewStrategy {
 
     const spouseIds = revealedUnions.get(personId) ?? [];
     if (spouseIds.length === 0) return [];
+
+    const xyScoped = this.buildXYLinkedNodesForPerson(
+      people,
+      linkedUnions,
+      personId,
+      ctx.rootId,
+      revealedUnions
+    );
 
     const allUnions = ctx.allUnionsFor(personId);
     const revealedUnionNodes = spouseIds.flatMap((spouseId) => {
@@ -65,7 +73,7 @@ export class DescendancyViewStrategy implements ViewStrategy {
 
     const allNodes: UnionNode[] = [
       ...revealedUnionNodes,
-      ...this.buildXYLinkedNodes(people, linkedUnions),
+      ...xyScoped,
       ...(siblingView && personId === ctx.rootId
         ? this.buildSiblingViewNodes(personId, revealedUnionNodes, allUnions, depth, ctx)
         : []),
@@ -115,14 +123,50 @@ export class DescendancyViewStrategy implements ViewStrategy {
       .filter((n): n is LinkedParentNode => n != null);
   }
 
-  private buildXYLinkedNodes(
+  /**
+   * Primary parent on the birth union for `anchorId` (same rule as applyParents re-root).
+   * Used to attach `__xy__` adoptive rows next to that parent's spouse line when the anchor has no spouses revealed.
+   */
+  private xyAttachmentParentId(anchorId: string, people: Map<string, DescendancyPerson>): string | null {
+    const parentUnions = getParentUnionsByChild().get(anchorId) ?? [];
+    if (parentUnions.length === 0) return null;
+    const birthUnion =
+      parentUnions.find((u) => u.children.find((c) => c.id === anchorId)?.pedi === "birth") ??
+      parentUnions[0];
+    const isHusbUnknown = people.get(birthUnion.husb)?.firstName === "Unknown";
+    return isHusbUnknown ? birthUnion.wife : birthUnion.husb;
+  }
+
+  /**
+   * Renders `__xy__*` linked parent pairs for at most one row per entry:
+   * - If the anchor has revealed spouses, only on the anchor's union fan-out.
+   * - Otherwise on the birth-union primary parent's row (so adoptive parents still appear next to e.g. Martin & Yvonne).
+   * Entries without `xyAnchorPersonId` (legacy) attach only to the chart root row.
+   * Sibling-view adoptive couples use {@link buildSiblingViewNodes} / {@link SiblingAdoptiveUnionNode}, not this path.
+   */
+  private buildXYLinkedNodesForPerson(
     people: Map<string, DescendancyPerson>,
-    linkedUnions: Map<string, LinkedUnionEntry[]>
+    linkedUnions: Map<string, LinkedUnionEntry[]>,
+    personId: string,
+    rootId: string,
+    revealedUnions: Map<string, string[]>
   ): UnionNode[] {
     const nodes: UnionNode[] = [];
     for (const [key, entries] of linkedUnions) {
       if (!key.startsWith("__xy__")) continue;
       for (const entry of entries) {
+        const anchor = entry.xyAnchorPersonId;
+        if (anchor != null) {
+          const anchorSpouses = revealedUnions.get(anchor) ?? [];
+          if (anchorSpouses.length > 0) {
+            if (personId !== anchor) continue;
+          } else {
+            const attachTo = this.xyAttachmentParentId(anchor, people);
+            if (attachTo == null || personId !== attachTo) continue;
+          }
+        } else if (personId !== rootId) {
+          continue;
+        }
         const { xId, unionId, husbId } = entry;
         if (!husbId) continue;
         const husbPerson = people.get(husbId);
@@ -198,8 +242,16 @@ export class DescendancyViewStrategy implements ViewStrategy {
     const siblingView = this.viewState.siblingView!;
     const nodes: UnionNode[] = [];
     if (revealedUnionNodes.length > 0) {
-      (revealedUnionNodes[0] as NormalUnionNode).connectorColor = SIBLING_COLORS.xyUnion;
+      const bioUnion = revealedUnionNodes[0] as NormalUnionNode;
+      const hasMultipleFamiliesAsChild = (siblingView.adoptiveUnions?.length ?? 0) > 0;
+      if (hasMultipleFamiliesAsChild) {
+        bioUnion.connectorColor = SIBLING_COLORS.xyUnion;
+      } else {
+        bioUnion.connectorColor = undefined;
+      }
     }
+    const catchAllStrokeByIndex = [SIBLING_COLORS.xCatchAll, SIBLING_COLORS.yCatchAll];
+    let spouseCatchIdx = 0;
     for (const catchPersonId of siblingView.spouseCatchAlls ?? []) {
       const excludeUnion = allUnions.find(
         (u) =>
@@ -212,11 +264,12 @@ export class DescendancyViewStrategy implements ViewStrategy {
       const node = this.buildSiblingCatchAll(
         catchPersonId,
         excludeUnionId,
-        SIBLING_COLORS.yCatchAll,
+        catchAllStrokeByIndex[spouseCatchIdx % catchAllStrokeByIndex.length]!,
         false,
         depth,
         ctx
       );
+      spouseCatchIdx++;
       if (node) nodes.push(node);
     }
     for (const unionId of siblingView.adoptiveUnions ?? []) {

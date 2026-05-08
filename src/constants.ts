@@ -9,6 +9,9 @@ export const MAX_HISTORY = 21;
 /** Default max tree depth when not passed to buildView / buildTree. */
 export const DEFAULT_MAX_DEPTH = 6;
 
+/** Default ancestor generations to fetch/render in pedigree view (column count ≈ depth + 1). */
+export const DEFAULT_PEDIGREE_DEPTH = 4;
+
 /**
  * Default tree root xref. The fallback @I0082@ may resolve to Alfred Gonsalves in your DB.
  * For Agustino Gracis as default root, set NEXT_PUBLIC_DEFAULT_TREE_ROOT in .env.local to his xref,

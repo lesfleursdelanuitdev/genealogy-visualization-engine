@@ -21,6 +21,11 @@ export interface UsePanZoomOptions {
   bounds: PanZoomBounds | null;
   baseX: number;
   baseY: number;
+  /**
+   * When true, skip layout-origin initial pan/zoom (descendancy-style root at layout 0,0).
+   * Pedigree / vertical pedigree call `scheduleCenterOnPerson(rootId)` after layout instead.
+   */
+  deferLayoutOriginInitialPan?: boolean;
 }
 
 export function usePanZoom({
@@ -28,6 +33,7 @@ export function usePanZoom({
   bounds,
   baseX,
   baseY,
+  deferLayoutOriginInitialPan = false,
 }: UsePanZoomOptions) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [scale, setScale] = useState(INITIAL_SCALE);
@@ -72,6 +78,9 @@ export function usePanZoom({
       const rect = svg.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return;
       hasSetInitialView.current = true;
+      if (deferLayoutOriginInitialPan) {
+        return;
+      }
       const px = rect.width / 2 - baseXRef.current;
       const py = INITIAL_TOP_PADDING - baseYRef.current;
       // Defer so layout is complete (SVG may not have final size in same frame)
@@ -87,7 +96,7 @@ export function usePanZoom({
     });
     ro.observe(svg);
     return () => ro.disconnect();
-  }, [bounds, svgRef]);
+  }, [bounds, svgRef, deferLayoutOriginInitialPan]);
 
   const zoomIn = useCallback(
     () => setScale((s) => Math.min(ZOOM_MAX, s * ZOOM_STEP)),

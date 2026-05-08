@@ -21,10 +21,17 @@ export function pushHistory(
   newViewState: unknown,
   actionLabel: string,
   triggerPersonId?: string,
-  personDisplay?: HistoryPersonDisplay
+  personDisplay?: HistoryPersonDisplay,
+  /** When set, stored on the entry (e.g. after SET_VIEW_STRATEGY). Otherwise current `state.strategyName`. */
+  strategyNameForEntry?: string
 ): { history: TreeState["history"]; historyIndex: number } {
   const truncated = state.history.slice(0, state.historyIndex + 1);
-  const entry: TreeState["history"][0] = { rootId: newRootId, viewState: newViewState, actionLabel };
+  const entry: TreeState["history"][0] = {
+    rootId: newRootId,
+    viewState: newViewState,
+    actionLabel,
+    strategyName: strategyNameForEntry ?? state.strategyName,
+  };
   if (triggerPersonId !== undefined) entry.triggerPersonId = triggerPersonId;
   if (personDisplay) {
     if (personDisplay.triggerPersonFullName !== undefined) entry.triggerPersonFullName = personDisplay.triggerPersonFullName;

@@ -19,5 +19,6 @@ export function applyRestoreHistory(
     historyIndex: safeIndex,
     rootId: entry.rootId,
     viewState: entry.viewState ?? state.viewState,
+    strategyName: entry.strategyName ?? state.strategyName ?? "descendancy",
   };
 }

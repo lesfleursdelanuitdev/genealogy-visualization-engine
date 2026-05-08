@@ -3,7 +3,7 @@
  * Layout algorithm and React rendering live elsewhere.
  */
 
-export { MAX_HISTORY, DEFAULT_MAX_DEPTH, DEFAULT_ROOT_XREF } from "./constants";
+export { MAX_HISTORY, DEFAULT_MAX_DEPTH, DEFAULT_PEDIGREE_DEPTH, DEFAULT_ROOT_XREF } from "./constants";
 export {
   PERSON_WIDTH,
   PERSON_HEIGHT,
@@ -12,10 +12,18 @@ export {
   GAP,
   VERTICAL_GAP,
   PADDING,
+  DEFAULT_TREE_CONNECTOR_FALLBACK_HEX,
   SIBLING_COLORS,
 } from "./strategies/descendancy/constants";
 
-export type { ViewStrategyDescriptor, ConnectorHelpers, BuildStrategyOptions, Bounds, StrategyConstants } from "./strategies/ViewStrategyDescriptor";
+export type {
+  ViewStrategyDescriptor,
+  ConnectorHelpers,
+  BuildStrategyOptions,
+  Bounds,
+  StrategyConstants,
+  LayoutBoundsOptions,
+} from "./strategies/ViewStrategyDescriptor";
 export { FamilyTreeBuilder, buildTree, setCurrentBuilder, clearCurrentBuilder } from "./builder";
 export type { FamilyTreeBuildOptions, FamilyTreeBuilderInput, BuildTreeOptions } from "./builder";
 export { defaultConnectors } from "./strategies/descendancy";
@@ -48,6 +56,7 @@ export { visualHalfWidth, getBounds } from "./strategies/descendancy/bounds";
 export { collectAll, collectAllPersonNodes, getMaxDepth, findUnionContainingPerson } from "./bounds";
 
 export { layout, markUnions, isContainer } from "./strategies/descendancy";
+export { DEFAULT_PEDIGREE_PARENT_PAIR_GAP } from "./strategies/pedigree/pedigreeLayout";
 
 export {
   buildView,
@@ -106,9 +115,53 @@ export {
   type ComputeFitToViewportOptions,
 } from "./helpers";
 
+export type { ChartViewStrategyName, ChartViewBuildAdapter } from "./chartView";
+export {
+  CHART_VIEW_STRATEGIES,
+  isChartViewStrategyName,
+  DescendancyChartAdapter,
+  PedigreeChartBuilder,
+  VerticalPedigreeChartBuilder,
+  FanChartBuilder,
+} from "./chartView";
+
+export {
+  bandThicknessForGeneration,
+  buildFanGeometry,
+  bindFanGeometry,
+  computeFanMaxOuterRadius,
+  polarToCartesian,
+  radialLabelRotationDeg,
+  tangentialLabelRotationDeg,
+  buildAnnularSectorPath,
+  buildTextArcPath,
+  buildGenderBandArcPath,
+  buildFanTextArcPathInRadialZone,
+  computeFanCellTextBounds,
+  computeAvatarPlacement,
+  DEFAULT_FAN_CHROME_LAYOUT,
+  fanTextZoneArcLength,
+  getMoreButtonCenter,
+  moreButtonChevronRotationDeg,
+  fanChartDescriptor,
+  FAN_CHART_DEFAULTS,
+  type FanGeometry,
+  type FanGeometryOptions,
+  type FanChartLabelOptions,
+  type FanChartOptions,
+  type FanCell,
+  type FanPoint,
+  type FanAncestorData,
+  type FanRenderOptions,
+  type RenderableFanCell,
+  type FanChromeLayoutOptions,
+} from "./strategies/fanChart";
+
 export {
   useChartSearch,
   useDescendancyFetch,
+  useChartViewFetch,
+  type UseChartViewFetchResult,
   useDepth,
   usePanelVisibility,
   usePanToPerson,

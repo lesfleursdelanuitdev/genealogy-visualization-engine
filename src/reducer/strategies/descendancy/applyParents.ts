@@ -54,6 +54,7 @@ function applyParentsAsRoot(
           husbId: u.husb,
           unionId,
           bothNewcomers: true,
+          xyAnchorPersonId: personId,
         },
       ]);
     }
@@ -143,6 +144,7 @@ function applyParentsInTree(
             husbId: u.husb,
             unionId,
             bothNewcomers: true,
+            xyAnchorPersonId: personId,
           },
         ]);
       }

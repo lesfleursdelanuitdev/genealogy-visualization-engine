@@ -18,6 +18,12 @@ export const VERTICAL_GAP = 100;
 /** Padding around the chart for SVG viewport */
 export const PADDING = 80;
 
+/**
+ * Fallback hex for default descendancy connectors (matches `ConnectorLines` when
+ * `var(--tree-connector, …)` is not applied). Used for legend swatches where lines use default stroke.
+ */
+export const DEFAULT_TREE_CONNECTOR_FALLBACK_HEX = "#9A8F7C";
+
 /** Sibling view connector/legend colors. */
 export const SIBLING_COLORS = {
   xyUnion: "#6366f1",

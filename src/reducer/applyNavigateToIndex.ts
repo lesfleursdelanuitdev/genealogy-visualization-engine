@@ -12,5 +12,6 @@ export function applyNavigateToIndex(state: TreeState, index: number): TreeState
     historyIndex: index,
     rootId: entry.rootId,
     viewState: entry.viewState,
+    strategyName: entry.strategyName ?? state.strategyName ?? "descendancy",
   };
 }

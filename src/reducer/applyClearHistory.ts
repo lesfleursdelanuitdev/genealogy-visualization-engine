@@ -17,5 +17,6 @@ export function applyClearHistory(state: TreeState): TreeState {
     historyIndex: 0,
     rootId: singleEntry.rootId,
     viewState: singleEntry.viewState ?? state.viewState,
+    strategyName: singleEntry.strategyName ?? state.strategyName,
   };
 }

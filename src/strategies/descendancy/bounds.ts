@@ -20,6 +20,10 @@ import {
 
 export function collectAll(node: ChartNode, acc: ChartNode[] = []): ChartNode[] {
   acc.push(node);
+  if (node instanceof UnionNode) {
+    collectAll(node.left, acc);
+    if (node.right) collectAll(node.right, acc);
+  }
   for (const c of node.children) collectAll(c, acc);
   return acc;
 }

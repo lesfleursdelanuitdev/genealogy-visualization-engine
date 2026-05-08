@@ -4,13 +4,21 @@ import type { ViewState } from "../types";
 export type PersonCardAction =
   | "showSpouses"
   | "showSiblings"
-  | "parents"
   | "root"
   | "closeSpouse"
   | "closeLinkedUnion"
   | "expandDown" // Leaf-only down-arrow button; behavior TBD
   | "collapseSubtree"
-  | "expandSubtree";
+  | "expandSubtree"
+  /** Pedigree / vertical pedigree — official card menu (not used on descendancy). */
+  | "pedigreeChooseParentFamily"
+  | "pedigreeCollapseAncestors"
+  | "pedigreeShowSiblingsRoot"
+  | "pedigreeShowChildrenRoot"
+  | "pedigreeExpandAncestors"
+  /** Undo ancestor collapse at this person (show ancestors again). */
+  | "pedigreeRestoreAncestors"
+  | "pedigreeReroot";
 
 export interface HandlePersonCardActionContext {
   dispatch: (action: TreeAction) => void;

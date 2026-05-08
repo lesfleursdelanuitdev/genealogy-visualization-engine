@@ -1,4 +1,4 @@
-import { getPeople, getParentUnionsByChild } from "../testdata";
+import { getPeople } from "../testdata";
 import type { PersonCardAction, HandlePersonCardActionContext } from "./types";
 
 export function handlePersonCardAction(
@@ -68,42 +68,9 @@ export function handlePersonCardAction(
     return;
   }
 
-  if (action === "parents") {
-    const parentUnions = getParentUnionsByChild().get(personId) ?? [];
-    if (parentUnions.length === 0) return;
-
-    const peopleMap = getPeople();
-    const isAdopted =
-      parentUnions.length > 1 ||
-      parentUnions.some((u) => u.children.find((c) => c.id === personId)?.pedi === "adopted");
-
-    dispatch({ type: "PARENTS", personId });
-    setDrawerPersonId(null);
-    setPan({ x: 0, y: 0 });
-    triggerBlinkBack();
-
-    if (isAdopted) {
-      const person = peopleMap.get(personId);
-      if (person) {
-        const parts = parentUnions.map((u) => {
-          const pedi = u.children.find((c) => c.id === personId)?.pedi ?? "birth";
-          const names = [peopleMap.get(u.husb), peopleMap.get(u.wife)]
-            .filter((p): p is NonNullable<typeof p> => p != null && p.firstName !== "Unknown")
-            .map((p) => p.firstName)
-            .join(" & ");
-          return { pedi, names };
-        });
-        setToast({
-          title: person.firstName + " " + person.lastName + " has multiple parent records",
-          parts,
-        });
-        setTimeout(() => setToast(null), 6000);
-      }
-    }
-  }
-
   if (action === "collapseSubtree") {
     dispatch({ type: "COLLAPSE_SUBTREE", personId });
+    dispatch({ type: "PAN_TO_PERSON", personId });
     return;
   }
 
