@@ -72,7 +72,10 @@ export function buildTree(
 
       if (depth >= maxDepth) {
         const hiddenCount = getHiddenCount?.(personId);
-        return new PersonNode({ ...person, ...(hiddenCount != null && { _hiddenCount: hiddenCount }) });
+        const atMaxPerson = { ...person, ...(hiddenCount != null && { _hiddenCount: hiddenCount }) };
+        const unionNodes = strategy.buildUnionNodes(personId, depth, ctx);
+        if (unionNodes.length > 0) return new PersonNode(atMaxPerson, unionNodes);
+        return new PersonNode(atMaxPerson);
       }
 
       const unionNodes = strategy.buildUnionNodes(personId, depth, ctx);

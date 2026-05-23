@@ -15,7 +15,28 @@ import {
 } from "../../nodes";
 import { getParentUnionsByChild, getUnionById, getUnionsByPerson } from "../../testdata";
 import type { ViewState, LinkedUnionEntry, UnionRecord } from "../../types";
+import { shouldSkipCatchAllForFamilyUnit } from "../../reducer/strategies/descendancy/familyUnitScope";
 import type { BuildContext, ViewStrategy } from "../ViewStrategy";
+
+function resolveUnionBetweenPartners(
+  allUnions: UnionRecord[],
+  personId: string,
+  spouseId: string,
+  familyXref?: string | null
+): UnionRecord | undefined {
+  const matching = allUnions.filter(
+    (u) =>
+      (u.husb === personId && u.wife === spouseId) ||
+      (u.husb === spouseId && u.wife === personId)
+  );
+  if (matching.length === 0) return undefined;
+  const fam = familyXref?.trim();
+  if (fam) {
+    const byFamily = matching.find((u) => u.id === fam);
+    if (byFamily) return byFamily;
+  }
+  return matching[0];
+}
 
 export class DescendancyViewStrategy implements ViewStrategy {
   constructor(
@@ -46,12 +67,13 @@ export class DescendancyViewStrategy implements ViewStrategy {
     );
 
     const allUnions = ctx.allUnionsFor(personId);
+    const familyScope = this.viewState.familyUnitScope;
     const revealedUnionNodes = spouseIds.flatMap((spouseId) => {
-      const union = allUnions.find(
-        (u) =>
-          (u.husb === personId && u.wife === spouseId) ||
-          (u.husb === spouseId && u.wife === personId)
-      );
+      const scopedFamilyXref =
+        familyScope?.personId === personId && familyScope.spouseId === spouseId
+          ? familyScope.familyXref
+          : null;
+      const union = resolveUnionBetweenPartners(allUnions, personId, spouseId, scopedFamilyXref);
       if (!union) return [];
       const rightPerson = people.get(spouseId) ?? null;
       const rightNode = rightPerson ? new PersonNode({ ...rightPerson, _onlyRoot: false }) : null;
@@ -81,7 +103,12 @@ export class DescendancyViewStrategy implements ViewStrategy {
 
     const skipRootCatchAllInSiblingView =
       siblingView && personId === ctx.rootId && (siblingView.spouseCatchAlls?.length ?? 0) > 0;
-    if (!skipRootCatchAllInSiblingView) {
+    const skipCatchAllForFamilyUnit = shouldSkipCatchAllForFamilyUnit(
+      this.viewState,
+      personId,
+      ctx.rootId
+    );
+    if (!skipRootCatchAllInSiblingView && !skipCatchAllForFamilyUnit) {
       const catchAll = this.buildCatchAllNode(
         people.get(personId)!,
         allUnions,

@@ -11,6 +11,10 @@ export interface UseDepthOptions {
   viewState: ViewState;
   maxDepthRendered: number;
   builder: FamilyTreeBuilder | null | undefined;
+  /**
+   * Some strategies (pedigree/fan) have rendered-depth semantics that should not overwrite user-selected depth.
+   */
+  disableRenderedDepthSync?: boolean;
 }
 
 export interface UseDepthResult {
@@ -30,6 +34,7 @@ export function useDepth({
   viewState,
   maxDepthRendered,
   builder,
+  disableRenderedDepthSync = false,
 }: UseDepthOptions): UseDepthResult {
   const [maxDepth, setMaxDepth] = useState(DEFAULT_MAX_DEPTH);
 
@@ -69,6 +74,7 @@ export function useDepth({
   // Sync current depth to rendered depth when they differ and we're not in a displayDepth-driven build (e.g. mid–Show children).
   // After re-root or "Show parents", rendered depth may be less or more than current; keep reducer and UI in sync.
   useEffect(() => {
+    if (disableRenderedDepthSync) return;
     if (builder == null) return;
     if (maxDepthRendered === 0) return; // no tree built yet
     if (viewState.displayDepth != null) return; // let Show children / displayDepth drive depth for this build
@@ -88,15 +94,17 @@ export function useDepth({
     effectiveCurrentDepth,
     viewState.displayDepth,
     dispatch,
+    disableRenderedDepthSync,
   ]);
 
   // When displayDepth was set (e.g. Show children) and we've built that deep, sync maxDepth
   useEffect(() => {
+    if (disableRenderedDepthSync) return;
     if (builder == null || viewState.displayDepth == null) return;
     if (maxDepthRendered >= viewState.displayDepth) {
       setMaxDepth(viewState.displayDepth);
     }
-  }, [builder, maxDepthRendered, viewState.displayDepth]);
+  }, [builder, maxDepthRendered, viewState.displayDepth, disableRenderedDepthSync]);
 
   const currentDepthRendered = maxDepthRendered;
   const atMaxDepth = currentDepthRendered >= DEFAULT_MAX_DEPTH;

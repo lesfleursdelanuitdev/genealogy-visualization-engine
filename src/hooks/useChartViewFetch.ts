@@ -12,6 +12,12 @@ import { PedigreeChartBuilder } from "../chartView/PedigreeChartBuilder";
 import { VerticalPedigreeChartBuilder } from "../chartView/VerticalPedigreeChartBuilder";
 import { FanChartBuilder } from "../chartView/FanChartBuilder";
 import type { ChartViewBuildAdapter } from "../chartView/ChartViewBuildAdapter";
+import {
+  chartSwitchAdapterFromPayloadBegin,
+  chartSwitchAdapterFromPayloadEnd,
+  chartSwitchChartFetchBegin,
+  chartSwitchChartFetchEnd,
+} from "../debug/chartSwitchTiming";
 
 interface ApiPerson {
   id: string;
@@ -160,35 +166,50 @@ export function useChartViewFetch(
           ? `/api/tree/sibling-view?person=${encodeURIComponent(normalizeRootXref(siblingViewPersonId!))}&depth=${maxDepth}`
           : `/api/tree/descendancy?root=${encodeURIComponent(normalizeRootXref(rootId))}&depth=${maxDepth}`;
 
+    let chartFetchResponseHandled = false;
+    const endChartFetchTimerOnce = () => {
+      if (chartFetchResponseHandled) return;
+      chartFetchResponseHandled = true;
+      chartSwitchChartFetchEnd();
+    };
+
+    chartSwitchChartFetchBegin();
     fetch(url)
-      .then((res) =>
-        res.ok ? res.json() : Promise.reject(new Error(`${res.status} ${res.statusText}`))
-      )
+      .then((res) => {
+        endChartFetchTimerOnce();
+        return res.ok ? res.json() : Promise.reject(new Error(`${res.status} ${res.statusText}`));
+      })
       .then((data: ApiResponse) => {
         if (useSiblingView && data.siblingView) {
           onSiblingViewMetaRef.current?.(data.siblingView);
         }
-        const { peopleList, unions } = mapPeopleAndUnions(data);
-        if (usesPedigreeApi) {
-          setPedigreeMultiFamilyChildXrefs(data.multiFamilyChildXrefs ?? []);
+        chartSwitchAdapterFromPayloadBegin();
+        try {
+          const { peopleList, unions } = mapPeopleAndUnions(data);
+          if (usesPedigreeApi) {
+            setPedigreeMultiFamilyChildXrefs(data.multiFamilyChildXrefs ?? []);
+          }
+          const treeBuilder = new FamilyTreeBuilder({ people: peopleList, unions });
+          const adapter: ChartViewBuildAdapter =
+            strategyName === "pedigree"
+              ? new PedigreeChartBuilder(treeBuilder)
+              : strategyName === "vertical_pedigree"
+                ? new VerticalPedigreeChartBuilder(treeBuilder)
+                : strategyName === "fan_chart"
+                  ? new FanChartBuilder(treeBuilder)
+                : new DescendancyChartAdapter(treeBuilder);
+          setChartAdapter(adapter);
+          setCurrentBuilder(treeBuilder);
+          setLastApiRootId(data.rootId);
+          clearDescendantCountCache();
+          setChartDataKey((k) => k + 1);
+          setIsChartLoading(false);
+        } finally {
+          chartSwitchAdapterFromPayloadEnd();
         }
-        const treeBuilder = new FamilyTreeBuilder({ people: peopleList, unions });
-        const adapter: ChartViewBuildAdapter =
-          strategyName === "pedigree"
-            ? new PedigreeChartBuilder(treeBuilder)
-            : strategyName === "vertical_pedigree"
-              ? new VerticalPedigreeChartBuilder(treeBuilder)
-              : strategyName === "fan_chart"
-                ? new FanChartBuilder(treeBuilder)
-              : new DescendancyChartAdapter(treeBuilder);
-        setChartAdapter(adapter);
-        setCurrentBuilder(treeBuilder);
-        setLastApiRootId(data.rootId);
-        clearDescendantCountCache();
-        setChartDataKey((k) => k + 1);
-        setIsChartLoading(false);
       })
       .catch((err) => {
+        endChartFetchTimerOnce();
         console.warn(
           `[Tree ${strategyName}] API request failed:`,
           err instanceof Error ? err.message : err

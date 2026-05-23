@@ -16,6 +16,7 @@ import { applySetCurrentDepth } from "./applySetCurrentDepth";
 import { applyPanToPerson } from "./applyPanToPerson";
 import { applyCollapseSubtree } from "./applyCollapseSubtree";
 import { applyExpandSubtree } from "./applyExpandSubtree";
+import { applySetFamilyUnitScope } from "./applySetFamilyUnitScope";
 
 type Handler = (state: TreeState, action: DescendancyAction) => TreeState;
 
@@ -53,6 +54,10 @@ const handlers: Record<DescendancyAction["type"], Handler> = {
     applyCollapseSubtree(s, (a as Extract<DescendancyAction, { type: "COLLAPSE_SUBTREE" }>).personId),
   EXPAND_SUBTREE: (s, a) =>
     applyExpandSubtree(s, (a as Extract<DescendancyAction, { type: "EXPAND_SUBTREE" }>).personId),
+  SET_FAMILY_UNIT_SCOPE: (s, a) => {
+    const d = a as Extract<DescendancyAction, { type: "SET_FAMILY_UNIT_SCOPE" }>;
+    return applySetFamilyUnitScope(s, d.personId, d.spouseId, d.familyXref);
+  },
 };
 
 export function reduceDescendancy(

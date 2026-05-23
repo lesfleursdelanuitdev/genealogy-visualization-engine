@@ -101,4 +101,16 @@ export interface ViewState {
    * Pedigree / vertical pedigree: when set, the chart omits ancestors above this person (they render as a leaf).
    */
   pedigreeAncestorCollapsePersonId?: string | null;
+  /**
+   * Descendancy: show only one family union for `personId` (exclusive spouse reveal).
+   * Catch-all is suppressed only when `personId` is the chart root.
+   */
+  familyUnitScope?: FamilyUnitScope | null;
+}
+
+/** Descendancy family-unit view: one partner union, optional GEDCOM family xref. */
+export interface FamilyUnitScope {
+  personId: string;
+  spouseId: string;
+  familyXref?: string | null;
 }

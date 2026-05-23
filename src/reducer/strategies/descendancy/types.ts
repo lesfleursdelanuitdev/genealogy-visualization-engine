@@ -21,7 +21,13 @@ export type DescendancyAction =
   | { type: "SET_CURRENT_DEPTH"; depth: number }
   | { type: "PAN_TO_PERSON"; personId: string }
   | { type: "COLLAPSE_SUBTREE"; personId: string }
-  | { type: "EXPAND_SUBTREE"; personId: string };
+  | { type: "EXPAND_SUBTREE"; personId: string }
+  | {
+      type: "SET_FAMILY_UNIT_SCOPE";
+      personId: string;
+      spouseId: string;
+      familyXref?: string | null;
+    };
 
 export const DESCENDANCY_ACTION_TYPES: DescendancyAction["type"][] = [
   "REVEAL_SPOUSE",
@@ -40,4 +46,5 @@ export const DESCENDANCY_ACTION_TYPES: DescendancyAction["type"][] = [
   "PAN_TO_PERSON",
   "COLLAPSE_SUBTREE",
   "EXPAND_SUBTREE",
+  "SET_FAMILY_UNIT_SCOPE",
 ];

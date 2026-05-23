@@ -2,6 +2,7 @@ import type { TreeState } from "../../types";
 import type { ViewState } from "../../../types";
 import { getPeople } from "../../../testdata";
 import { pushHistory } from "../../pushHistory";
+import { withoutFamilyUnitScope } from "./familyUnitScope";
 
 function viewState(state: TreeState): ViewState {
   return state.viewState as ViewState;
@@ -20,8 +21,21 @@ export function applyCloseAllSpousesForPerson(
 ): TreeState {
   const vs = state.viewState as ViewState;
   const nextRevealed = new Map(vs.revealedUnions ?? []);
+  // Capture spouses before deletion so we can clean up phantom reverse entries.
+  const formerSpouses = nextRevealed.get(personId) ?? [];
   nextRevealed.delete(personId);
-  const newViewState = { ...vs, revealedUnions: nextRevealed };
+  // Clean up phantom Si→[personId] entries left by a prior REVEAL_ALL_SPOUSES.
+  for (const spouseId of formerSpouses) {
+    const reverseList = nextRevealed.get(spouseId);
+    if (reverseList) {
+      const reverseFiltered = reverseList.filter((id) => id !== personId);
+      if (reverseFiltered.length === 0) nextRevealed.delete(spouseId);
+      else nextRevealed.set(spouseId, reverseFiltered);
+    }
+  }
+  const base =
+    vs.familyUnitScope?.personId === personId ? withoutFamilyUnitScope(vs) : vs;
+  const newViewState = { ...base, revealedUnions: nextRevealed };
   const personName = getFullName(personId);
   const person = getPeople().get(personId);
   const initials = person

@@ -2,6 +2,7 @@ import type { TreeState } from "../../types";
 import type { ViewState } from "../../../types";
 import { pushHistory } from "../../pushHistory";
 import { getPersonDisplay } from "../../getPersonDisplay";
+import { withoutFamilyUnitScope } from "./familyUnitScope";
 
 function vs(s: TreeState): ViewState {
   return s.viewState as ViewState;
@@ -16,7 +17,7 @@ export function applyRevealSpouse(
   const nextRevealed = new Map(v.revealedUnions ?? []);
   const existing = nextRevealed.get(personId) ?? [];
   if (!existing.includes(spouseId)) nextRevealed.set(personId, [...existing, spouseId]);
-  const newViewState = { ...v, revealedUnions: nextRevealed };
+  const newViewState = { ...withoutFamilyUnitScope(v), revealedUnions: nextRevealed };
   const { fullName, initials } = getPersonDisplay(personId);
   const hist = pushHistory(state, state.rootId, newViewState, "Show partner", personId, {
     triggerPersonId: personId,

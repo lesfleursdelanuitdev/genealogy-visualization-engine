@@ -8,6 +8,7 @@ import type { ChartNode } from "../nodes";
 import type { ViewState } from "../types";
 import type { LayoutBoundsOptions } from "../strategies/ViewStrategyDescriptor";
 import type { ChartViewBuildAdapter } from "../chartView/ChartViewBuildAdapter";
+import { chartSwitchLayoutBegin, chartSwitchLayoutEnd } from "../debug/chartSwitchTiming";
 
 const DEBUG_BUILDER = process.env.NEXT_PUBLIC_DEBUG_DESCENDANCY === "true";
 
@@ -84,9 +85,15 @@ export function useTreeBuild({
       layoutOptions.parentPairGap = parentPairGap;
     }
     const layoutOpts = Object.keys(layoutOptions).length > 0 ? layoutOptions : undefined;
-    strategy.layout(rootNode, layoutOpts);
-    strategy.markUnions?.(rootNode);
-    const b = strategy.getBounds(rootNode, layoutOpts);
+    let b: { minX: number; maxX: number; maxY: number };
+    chartSwitchLayoutBegin();
+    try {
+      strategy.layout(rootNode, layoutOpts);
+      strategy.markUnions?.(rootNode);
+      b = strategy.getBounds(rootNode, layoutOpts);
+    } finally {
+      chartSwitchLayoutEnd();
+    }
     const padding = strategy.constants.PADDING;
     return {
       root: rootNode,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { PERSON_WIDTH } from "../strategies/descendancy/constants";
 
 export interface PanZoomBounds {
   minX: number;
@@ -26,6 +27,8 @@ export interface UsePanZoomOptions {
    * Pedigree / vertical pedigree call `scheduleCenterOnPerson(rootId)` after layout instead.
    */
   deferLayoutOriginInitialPan?: boolean;
+  /** When true, use fit-to-screen for initial view (non-pedigree) or left-align root (pedigree via embedCenterOnPosition). */
+  embedMode?: boolean;
 }
 
 export function usePanZoom({
@@ -34,6 +37,7 @@ export function usePanZoom({
   baseX,
   baseY,
   deferLayoutOriginInitialPan = false,
+  embedMode = false,
 }: UsePanZoomOptions) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [scale, setScale] = useState(INITIAL_SCALE);
@@ -54,11 +58,13 @@ export function usePanZoom({
   const pinchStartPanRef = useRef({ x: 0, y: 0 });
   const scaleRef = useRef(scale);
   const panRef = useRef(pan);
+  const embedModeRef = useRef(embedMode);
   boundsRef.current = bounds;
   baseXRef.current = baseX;
   baseYRef.current = baseY;
   scaleRef.current = scale;
   panRef.current = pan;
+  embedModeRef.current = embedMode;
   const boundsKey = bounds ? `${bounds.minX},${bounds.maxX},${bounds.maxY}` : null;
   if (boundsKey !== boundsKeyRef.current) {
     boundsKeyRef.current = boundsKey;
@@ -79,6 +85,19 @@ export function usePanZoom({
       if (rect.width <= 0 || rect.height <= 0) return;
       hasSetInitialView.current = true;
       if (deferLayoutOriginInitialPan) {
+        return;
+      }
+      if (embedModeRef.current) {
+        const tw = b.maxX - b.minX;
+        const th = b.maxY + 100;
+        const fitScale = Math.min(1, Math.min((rect.width - 160) / tw, (rect.height - 80) / th));
+        const s = Math.max(0.25, Math.min(1.2, fitScale));
+        const px = rect.width / 2 - baseXRef.current;
+        const py = INITIAL_TOP_PADDING - baseYRef.current;
+        requestAnimationFrame(() => {
+          setPan({ x: px, y: py });
+          setScale(s);
+        });
         return;
       }
       const px = rect.width / 2 - baseXRef.current;
@@ -129,6 +148,22 @@ export function usePanZoom({
       const s = INITIAL_SCALE;
       const px = rect.width / 2 - baseX - layoutX * s;
       const py = INITIAL_TOP_PADDING - baseY - layoutY * s;
+      setPan({ x: px, y: py });
+      setScale(s);
+    },
+    [svgRef, baseX, baseY]
+  );
+
+  /** Embed pedigree: root person's left edge at 10px from container left, vertically centered. */
+  const embedCenterOnPosition = useCallback(
+    (layoutX: number, layoutY: number) => {
+      const svg = svgRef.current;
+      if (!svg) return;
+      const rect = svg.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      const s = INITIAL_SCALE;
+      const px = 10 + (PERSON_WIDTH / 2) * s - baseX - layoutX * s;
+      const py = rect.height / 2 - baseY - layoutY * s;
       setPan({ x: px, y: py });
       setScale(s);
     },
@@ -281,6 +316,7 @@ export function usePanZoom({
     fitToScreen,
     goToInitialView,
     centerOnPosition,
+    embedCenterOnPosition,
     dragging,
     onPointerDown,
     onPointerMove,

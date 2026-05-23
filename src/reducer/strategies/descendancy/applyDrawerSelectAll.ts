@@ -3,6 +3,7 @@ import type { ViewState } from "../../../types";
 import { getPeople } from "../../../testdata";
 import { getSpousesOf } from "../../../builder/currentBuilder";
 import { pushHistory } from "../../pushHistory";
+import { withoutFamilyUnitScope } from "./familyUnitScope";
 
 function viewState(state: TreeState): ViewState {
   return state.viewState as ViewState;
@@ -23,7 +24,7 @@ export function applyDrawerSelectAll(
   const nextRevealed = new Map(vs.revealedUnions ?? []);
   const allSpouseIds = getSpousesOf(personId).map(({ spouseId }) => spouseId);
   if (allSpouseIds.length > 0) nextRevealed.set(personId, allSpouseIds);
-  const newViewState = { ...vs, revealedUnions: nextRevealed };
+  const newViewState = { ...withoutFamilyUnitScope(vs), revealedUnions: nextRevealed };
   const personName = getFullName(personId);
   const person = getPeople().get(personId);
   const initials = person
