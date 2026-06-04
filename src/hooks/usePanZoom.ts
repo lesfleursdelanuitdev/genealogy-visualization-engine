@@ -56,6 +56,8 @@ export function usePanZoom({
   const pinchStartCenterRef = useRef<{ x: number; y: number } | null>(null);
   const pinchStartScaleRef = useRef(INITIAL_SCALE);
   const pinchStartPanRef = useRef({ x: 0, y: 0 });
+  /** Tracks the element + pointer ID for the captured single-finger pointer so it can be released when a pinch starts. */
+  const capturedPointerRef = useRef<{ el: Element; id: number } | null>(null);
   const scaleRef = useRef(scale);
   const panRef = useRef(pan);
   const embedModeRef = useRef(embedMode);
@@ -193,7 +195,9 @@ export function usePanZoom({
       if (e.button !== 0) return;
       if (isPinchingRef.current) return;
       e.preventDefault();
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      const capturedEl = e.target as HTMLElement;
+      capturedEl.setPointerCapture(e.pointerId);
+      capturedPointerRef.current = { el: capturedEl, id: e.pointerId };
       setDragging(true);
       setDragStart({ x: e.clientX, y: e.clientY });
       setPanAtDrag(pan);
@@ -217,6 +221,9 @@ export function usePanZoom({
     const el = e.target as HTMLElement;
     if (el.hasPointerCapture?.(e.pointerId)) {
       el.releasePointerCapture(e.pointerId);
+    }
+    if (capturedPointerRef.current?.id === e.pointerId) {
+      capturedPointerRef.current = null;
     }
     setDragging(false);
   }, []);
@@ -259,7 +266,21 @@ export function usePanZoom({
 
     const onTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 2) {
+        // Prevent the browser (iOS Safari in particular) from claiming the
+        // pinch-zoom gesture at the OS level. Must be called before the browser
+        // commits to its own gesture, so touchstart must be non-passive.
+        e.preventDefault();
         isPinchingRef.current = true;
+        // Abort any active single-finger drag so pointer-move doesn't interfere.
+        setDragging(false);
+        // Release any captured pointer so it doesn't receive spurious pointermove events.
+        if (capturedPointerRef.current) {
+          const { el, id } = capturedPointerRef.current;
+          if ((el as HTMLElement).hasPointerCapture?.(id)) {
+            (el as HTMLElement).releasePointerCapture(id);
+          }
+          capturedPointerRef.current = null;
+        }
         pinchStartDistRef.current = getDist(e.touches[0], e.touches[1]);
         pinchStartCenterRef.current = getCenter(e.touches[0], e.touches[1]);
         pinchStartScaleRef.current = scaleRef.current;
@@ -294,7 +315,8 @@ export function usePanZoom({
       }
     };
 
-    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    // Non-passive so e.preventDefault() can suppress iOS Safari's native pinch-zoom gesture.
+    el.addEventListener("touchstart", onTouchStart, { passive: false });
     el.addEventListener("touchmove", onTouchMove, { passive: false });
     el.addEventListener("touchend", onTouchEnd, { passive: true });
     el.addEventListener("touchcancel", onTouchEnd, { passive: true });

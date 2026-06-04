@@ -8,6 +8,9 @@ import { Node } from "./Node";
 import type { ChartNode } from "./types";
 
 export class PersonNode extends Node<DescendancyPerson> {
+  /** Generation index stamped by pedigree layout (0 = root, 1 = parents, …). -1 when not in a pedigree layout. */
+  pedigreeGen = -1;
+
   constructor(person: DescendancyPerson, children: ChartNode[] = []) {
     super("person", person, children);
   }

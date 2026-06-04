@@ -85,7 +85,9 @@ function positionSubtree(
 export function layoutVerticalPedigree(root: ChartNode, options?: LayoutBoundsOptions): void {
   const ph = options?.personHeight ?? PERSON_HEIGHT;
   const generationGap = Math.max(240, ph + 72);
-  const cardWidth = PERSON_WIDTH;
+  const cardWidth = Number.isFinite(options?.personWidth) && options!.personWidth! > 0
+    ? options!.personWidth!
+    : PERSON_WIDTH;
 
   if (!(root instanceof PersonNode)) return;
 
@@ -123,7 +125,7 @@ export function layoutVerticalPedigree(root: ChartNode, options?: LayoutBoundsOp
   }
   if (Number.isFinite(minX)) {
     for (const p of persons) {
-      p.x = p.x - minX + PERSON_WIDTH / 2;
+      p.x = p.x - minX + cardWidth / 2;
     }
   }
 

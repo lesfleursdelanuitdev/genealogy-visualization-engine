@@ -24,6 +24,12 @@ export interface UseTreeBuildOptions {
   effectivePersonHeight?: number;
   /** Horizontal pedigree: vertical gap (px) between stacked parent cards; omit to use engine default. */
   parentPairGap?: number;
+  /** Horizontal pedigree: edge-to-edge horizontal gap (px) between generation columns (c.x width); omit to use engine default. */
+  pedigreeGenerationGap?: number;
+  /** Horizontal pedigree: when true, g=1 uses the full gap to leave room for root siblings. */
+  showRootSiblings?: boolean;
+  /** Width of a person card in px (default PERSON_WIDTH = 330). Affects pedigree column spacing. */
+  personWidth?: number;
 }
 
 export interface TreeBuildResult {
@@ -54,6 +60,9 @@ export function useTreeBuild({
   chartAdapter,
   effectivePersonHeight,
   parentPairGap,
+  pedigreeGenerationGap,
+  showRootSiblings,
+  personWidth,
 }: UseTreeBuildOptions): TreeBuildResult {
   return useMemo(() => {
     const currentDepth = viewState.currentDepth ?? viewState.displayDepth ?? maxDepth;
@@ -84,6 +93,15 @@ export function useTreeBuild({
     if (typeof parentPairGap === "number" && Number.isFinite(parentPairGap)) {
       layoutOptions.parentPairGap = parentPairGap;
     }
+    if (typeof pedigreeGenerationGap === "number" && Number.isFinite(pedigreeGenerationGap)) {
+      layoutOptions.pedigreeGenerationGap = pedigreeGenerationGap;
+    }
+    if (showRootSiblings) {
+      layoutOptions.showRootSiblings = true;
+    }
+    if (typeof personWidth === "number" && Number.isFinite(personWidth) && personWidth > 0) {
+      layoutOptions.personWidth = personWidth;
+    }
     const layoutOpts = Object.keys(layoutOptions).length > 0 ? layoutOptions : undefined;
     let b: { minX: number; maxX: number; maxY: number };
     chartSwitchLayoutBegin();
@@ -102,5 +120,5 @@ export function useTreeBuild({
       bounds: b,
       maxDepthRendered,
     };
-  }, [effectiveRootId, viewState, maxDepth, chartDataKey, chartAdapter, effectivePersonHeight, parentPairGap]);
+  }, [effectiveRootId, viewState, maxDepth, chartDataKey, chartAdapter, effectivePersonHeight, parentPairGap, pedigreeGenerationGap, showRootSiblings, personWidth]);
 }

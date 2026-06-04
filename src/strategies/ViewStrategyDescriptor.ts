@@ -27,12 +27,24 @@ export interface ConnectorHelpers {
 /** Options for layout and bounds when person card height varies by display settings. */
 export interface LayoutBoundsOptions {
   personHeight?: number;
+  /** Width of a person card in px. Defaults to PERSON_WIDTH (330). Affects pedigree column spacing and card rendering. */
+  personWidth?: number;
   /**
    * Horizontal pedigree (LTR): vertical gap (px) between the bottom of the first parent’s card
    * and the top of the second parent’s card when the pair is stacked. Center-to-center step is
    * `personHeight + parentPairGap`. Ignored by other strategies unless they adopt the same option.
    */
   parentPairGap?: number;
+  /**
+   * Horizontal pedigree (LTR): edge-to-edge horizontal gap (px) between a child card’s right edge
+   * and the parent card’s left edge (c.x width). Defaults to 72px.
+   */
+  pedigreeGenerationGap?: number;
+  /**
+   * Horizontal pedigree (LTR): when true, generation g=1 uses the full generation gap instead of
+   * the compact step, leaving room for root siblings in the g=0 column.
+   */
+  showRootSiblings?: boolean;
 }
 
 /** Bounding box of the laid-out tree. */

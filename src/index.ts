@@ -56,7 +56,7 @@ export { visualHalfWidth, getBounds } from "./strategies/descendancy/bounds";
 export { collectAll, collectAllPersonNodes, getMaxDepth, findUnionContainingPerson } from "./bounds";
 
 export { layout, markUnions, isContainer } from "./strategies/descendancy";
-export { DEFAULT_PEDIGREE_PARENT_PAIR_GAP } from "./strategies/pedigree/pedigreeLayout";
+export { DEFAULT_PEDIGREE_PARENT_PAIR_GAP, DEFAULT_PEDIGREE_GENERATION_GAP } from "./strategies/pedigree/pedigreeLayout";
 
 export {
   buildView,
