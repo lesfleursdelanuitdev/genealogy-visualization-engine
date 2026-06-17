@@ -31,6 +31,7 @@ interface ApiPerson {
   deathPlace?: string | null;
   gender?: string | null;
   photoUrl?: string | null;
+  isLiving?: boolean;
   [k: string]: unknown;
 }
 
@@ -87,6 +88,7 @@ function mapPeopleAndUnions(data: ApiResponse): {
       deathPlace,
       photoUrl: photo,
       gender: p.gender ?? null,
+      isLiving: p.isLiving === true,
     });
   }
   const unions = data.unions.map((u) => ({

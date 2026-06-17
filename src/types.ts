@@ -19,6 +19,8 @@ export interface DescendancyPerson {
   /** Full death / burial place display, as from tree API — never truncated. */
   deathPlace?: string | null;
   photoUrl?: string | null;
+  /** From tree API when available; used for living-person privacy on the public site. */
+  isLiving?: boolean;
   /** Display gender from data (e.g. "Male", "Female", "Unknown") for default icon. */
   gender?: string | null;
   /** Set on leaf nodes at MAX_DEPTH to show +N hidden descendants badge. */
