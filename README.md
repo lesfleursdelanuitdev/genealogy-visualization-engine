@@ -2,7 +2,29 @@
 
 Headless chart engine for family trees: it turns people and unions into laid-out chart nodes for descendancy, pedigree, vertical pedigree and fan charts.
 
+**Architecture:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+
 The engine does the hard part of a family tree viewer: deciding which people and families appear, and where. It does not draw anything itself. It gives you nodes with `x`/`y` positions, connector geometry, bounds, and (for fan charts) SVG path strings. Your React app renders those as SVG or HTML.
+
+## Screenshots
+
+These come from the Gonsalves family site and its admin app running on a demo database, loaded with the public US-presidents sample tree (`pres2020.ged`) through the real import pipeline. No family data is shown.
+
+<img src="docs/screenshots/pub-chart-descendancy.png" alt="Descendancy chart">
+
+*Descendancy chart.*
+
+<img src="docs/screenshots/pub-chart-pedigree.png" alt="Pedigree chart">
+
+*Pedigree chart.*
+
+<img src="docs/screenshots/pub-chart-fan.png" alt="Fan chart, five generations">
+
+*Fan chart, five generations.*
+
+<img src="docs/screenshots/pub-chart-fan-phone.png" alt="Fan chart on a phone" width="270">
+
+*Fan chart on a phone.*
 
 ## What it does
 
