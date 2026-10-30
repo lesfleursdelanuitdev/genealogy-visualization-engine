@@ -1,6 +1,6 @@
 import type { TreeState } from "../../types";
 import type { ViewState } from "../../../types";
-import { getPeople } from "../../../testdata";
+import { getPeople } from "../../../builder/currentBuilder";
 import { getSpousesOf } from "../../../builder/currentBuilder";
 import { pushHistory } from "../../pushHistory";
 import { withoutFamilyUnitScope } from "./familyUnitScope";

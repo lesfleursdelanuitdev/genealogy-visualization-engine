@@ -71,31 +71,19 @@ export { buildView, countDescendants } from "./strategies/descendancy";
 export type { ViewStrategy, BuildContext } from "./strategies/ViewStrategy";
 export { DescendancyViewStrategy, PedigreeViewStrategy } from "./strategies";
 
+export type { ViewState, UnionRecord, UnionChild, LinkedUnionEntry, SiblingView } from "./types";
+
+// Global "current builder" getters. Removed with the global builder (refactor phase 3).
 export {
-  buildTestTree,
-  clearCurrentTreeData,
   getPeople,
   getSpousesOf,
-  setCurrentTreeData,
-  PEOPLE_WITH_PARENTS,
-  PEOPLE_WITH_SPOUSES,
-  UNIONS,
-  UNIONS_BY_PERSON,
-  UNION_BY_ID,
-  PARENT_UNIONS_BY_CHILD,
-  BIRTH_UNION_BY_CHILD,
   getUnions,
   getUnionsByPerson,
   getAllChildrenOf,
   getParentUnionsByChild,
   getUnionById,
   getBirthUnionByChild,
-  type ViewState,
-  type UnionRecord,
-  type UnionChild,
-  type LinkedUnionEntry,
-  type SiblingView,
-} from "./testdata";
+} from "./builder";
 
 export {
   treeReducer,

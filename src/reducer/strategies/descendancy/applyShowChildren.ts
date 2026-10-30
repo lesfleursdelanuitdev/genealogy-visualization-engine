@@ -4,7 +4,7 @@
  * Case 2 (at max depth): prune top generation, re-root to R' from G_2, preserve G_2 row (expandDownTopRow).
  */
 
-import { getUnionsByPerson, getPeople } from "../../../testdata";
+import { getUnionsByPerson, getPeople } from "../../../builder/currentBuilder";
 import type { TreeState } from "../../types";
 import type { ViewState } from "../../../types";
 import { pushHistory } from "../../pushHistory";

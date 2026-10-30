@@ -1,4 +1,4 @@
-import { getParentUnionsByChild, getPeople } from "../../../testdata";
+import { getParentUnionsByChild, getPeople } from "../../../builder/currentBuilder";
 import type { TreeState } from "../../types";
 import type { ViewState } from "../../../types";
 import { pushHistory } from "../../pushHistory";

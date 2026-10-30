@@ -1,4 +1,4 @@
-import { getPeople, getUnionById } from "../testdata";
+import { getPeople, getUnionById } from "../builder/currentBuilder";
 import { DEFAULT_TREE_CONNECTOR_FALLBACK_HEX, SIBLING_COLORS } from "../strategies/descendancy/constants";
 import type { ViewState, SiblingView } from "../types";
 

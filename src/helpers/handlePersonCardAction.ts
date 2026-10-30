@@ -1,4 +1,4 @@
-import { getPeople } from "../testdata";
+import { getPeople } from "../builder/currentBuilder";
 import type { PersonCardAction, HandlePersonCardActionContext } from "./types";
 
 export function handlePersonCardAction(

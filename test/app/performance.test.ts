@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { layout, markUnions, buildTestTree } from "../../src";
+import { layout, markUnions } from "../../src";
+import { buildTestTree } from "../fixtures/smith";
 import { buildWideTree, buildDeepTree } from "./_fixtures";
 
 const LAYOUT_BUDGET_MS = 300;

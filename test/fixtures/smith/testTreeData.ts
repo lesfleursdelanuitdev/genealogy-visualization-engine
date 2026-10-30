@@ -1,72 +1,18 @@
 /**
- * Static test/demo tree data only. No API state, no current-tree logic.
- * Used as fallback when no API data is set, and for buildTestTree().
+ * The fictional Smith family as a hand-built chart tree and as a GraphSnapshot.
+ * Tests and demos only: nothing under src/ imports this.
  */
 
-import type { DescendancyPerson, UnionRecord } from "../types";
-import {
-  UNIONS,
-  ALL_CHILDREN_OF,
-  UNIONS_BY_PERSON,
-  UNION_BY_ID,
-  PARENT_UNIONS_BY_CHILD,
-  BIRTH_UNION_BY_CHILD,
-} from "./testUnions";
+import type { DescendancyPerson } from "../../../src/types";
+import { PersonNode, NormalUnionNode, type ChartNode } from "../../../src/nodes";
+import { createGraphSnapshot, type GraphSnapshot } from "../../../src/graph";
+import { UNIONS } from "./testUnions";
 import { buildPeople } from "./testPeople";
-import { PersonNode, NormalUnionNode, type ChartNode } from "../nodes";
 
-let peopleCache: Map<string, DescendancyPerson> | null = null;
-
-/** Static people map (cached). Used when no API data is set. */
-export function getPeople(): Map<string, DescendancyPerson> {
-  if (!peopleCache) peopleCache = buildPeople();
-  return peopleCache;
+/** The Smith family as engine input. */
+export function createTestGraphSnapshot(): GraphSnapshot {
+  return createGraphSnapshot({ people: [...buildPeople().values()], unions: UNIONS });
 }
-
-/** Static unions. */
-export function getUnions(): UnionRecord[] {
-  return UNIONS;
-}
-
-/** Static: unions where person is husband or wife. */
-export function getUnionsByPerson(): Map<string, UnionRecord[]> {
-  return UNIONS_BY_PERSON;
-}
-
-/** Static: all child ids for a person (both sides). */
-export function getAllChildrenOf(personId: string): string[] {
-  return ALL_CHILDREN_OF[personId] ?? [];
-}
-
-/** Static: unions in which this person appears as a child. */
-export function getParentUnionsByChild(): Map<string, UnionRecord[]> {
-  return PARENT_UNIONS_BY_CHILD;
-}
-
-/** Static: union by id. */
-export function getUnionById(): Map<string, UnionRecord> {
-  return UNION_BY_ID;
-}
-
-/** Static: birth union per child. */
-export function getBirthUnionByChild(): Map<string, UnionRecord> {
-  return BIRTH_UNION_BY_CHILD;
-}
-
-/** Static: all spouses of a person. */
-export function getSpousesOf(personId: string): { spouseId: string; union: UnionRecord }[] {
-  const list = UNIONS_BY_PERSON.get(personId) ?? [];
-  return list.map((u) => ({
-    spouseId: u.husb === personId ? u.wife : u.husb,
-    union: u,
-  }));
-}
-
-/** Person ids that appear as a child in any union (have known parents). */
-export const PEOPLE_WITH_PARENTS = new Set(UNIONS.flatMap((u) => u.children.map((c) => c.id)));
-
-/** Person ids that appear on either side of a union (can show "spouses" UI). */
-export const PEOPLE_WITH_SPOUSES = new Set(UNIONS.flatMap((u) => [u.husb, u.wife]));
 
 export function unknownPerson(id: string): PersonNode {
   const p: DescendancyPerson = {

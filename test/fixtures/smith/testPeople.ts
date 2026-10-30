@@ -1,9 +1,8 @@
 /**
- * Static test/demo people for the descendancy chart.
- * Used when no API data is set (fallback in getPeople() in treeData).
+ * Static test/demo people for the fictional Smith family (tests and demos only).
  */
 
-import type { DescendancyPerson } from "../types";
+import type { DescendancyPerson } from "../../../src/types";
 
 function person(
   o: Partial<DescendancyPerson> & {
