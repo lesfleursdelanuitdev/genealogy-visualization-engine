@@ -19,6 +19,8 @@ export type DescendancyAction =
   | { type: "DRAWER_SELECT_ALL"; personId: string }
   | { type: "CLOSE_ALL_SPOUSES_FOR_PERSON"; personId: string }
   | { type: "SHOW_CHILDREN"; personId: string; atMaxDepth: boolean; currentDepth?: number }
+  /** "+N" chip tapped (T30): one more generation beyond this card, in the chart's direction. */
+  | { type: "SHOW_HIDDEN"; personId: string }
   | { type: "SET_CURRENT_DEPTH"; depth: number }
   | { type: "PAN_TO_PERSON"; personId: string }
   | { type: "COLLAPSE_SUBTREE"; personId: string }
@@ -43,6 +45,7 @@ export const DESCENDANCY_ACTION_TYPES: DescendancyAction["type"][] = [
   "DRAWER_SELECT_ALL",
   "CLOSE_ALL_SPOUSES_FOR_PERSON",
   "SHOW_CHILDREN",
+  "SHOW_HIDDEN",
   "SET_CURRENT_DEPTH",
   "PAN_TO_PERSON",
   "COLLAPSE_SUBTREE",

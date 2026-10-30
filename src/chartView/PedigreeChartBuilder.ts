@@ -7,6 +7,7 @@ import type { DescendancyPerson } from "../types";
 import { PersonNode, NormalUnionNode } from "../nodes";
 import type { ChartNode } from "../nodes";
 import type { ChartViewBuildAdapter } from "./ChartViewBuildAdapter";
+import { countAncestors, parentFamilyToClimb } from "../graph/queries";
 
 function maxRenderedDepth(node: ChartNode, d = 0): number {
   let m = d;
@@ -37,7 +38,8 @@ function unknownPlaceholder(slot: "father" | "mother" | "parent", anchorId: stri
 }
 
 /**
- * Pedigree chart: dedicated build (ancestor chain via birth unions), not {@link ../builder/build.buildTree}.
+ * Pedigree chart: dedicated build (ancestor chain via the climbed parent family), not {@link ../builder/build.buildTree}.
+ * Fan and vertical pedigree reuse it.
  */
 export class PedigreeChartBuilder implements ChartViewBuildAdapter {
   readonly strategyName = "pedigree" as const;
@@ -53,19 +55,17 @@ export class PedigreeChartBuilder implements ChartViewBuildAdapter {
     const people = graph.people;
     const famcOverrides = viewState.pedigreeFamcOverrides ?? {};
     const rootFamc = (viewState.pedigreeFamcFamilyXref ?? "").trim() || null;
-
-    /**
-     * The family to climb from `id` (B13): the root's chosen family, or a chosen family for an
-     * ancestor, when it really lists `id` as a child; otherwise the birth family (T20).
-     */
-    const parentFamilyOf = (id: string, gen: number) => {
-      const chosen = (gen === 0 ? rootFamc ?? famcOverrides[id] : famcOverrides[id]) ?? null;
-      const u = chosen ? graph.unionById.get(chosen) : undefined;
-      if (u && u.children.some((c) => c.id === id)) return u;
-      return graph.birthUnionByChild.get(id);
-    };
     const effectiveDepth = viewState.currentDepth ?? maxDepth;
     const collapseAbovePersonId = (viewState.pedigreeAncestorCollapsePersonId ?? "").trim() || null;
+    const showParentsOf = new Set(viewState.showParentsOf ?? []);
+
+    /** B13: the root's chosen family, or an ancestor's chosen family, else the birth family (T20). */
+    const chosenFamilyFor = (id: string, gen: number) =>
+      (gen === 0 ? rootFamc ?? famcOverrides[id] : famcOverrides[id]) ?? null;
+
+    /** T30: distinct ancestors hidden above a card, along the same families the chart climbs. */
+    const hiddenAncestors = (id: string, gen: number) =>
+      countAncestors(graph, id, { famcOverrides, firstFamilyId: gen === 0 ? rootFamc : null });
 
     const visiting = new Set<string>();
 
@@ -78,34 +78,35 @@ export class PedigreeChartBuilder implements ChartViewBuildAdapter {
       photoUrl: null,
     });
 
-    const buildPerson = (id: string, gen: number): PersonNode => {
+    const known = (id: string | undefined) => {
+      const t = (id ?? "").trim();
+      return t && people.get(t)?._unknownPlaceholder !== true ? t : "";
+    };
+
+    /**
+     * `cap`: the generation at which this branch stops (the depth limit, or one row past a card
+     * whose chip was tapped). A card at the cap, or the collapsed card, shows "+N" instead of
+     * its parents, unless its chip was tapped (showParentsOf): then its parents appear, one row.
+     */
+    const buildPerson = (id: string, gen: number, cap: number): PersonNode => {
       if (visiting.has(id)) {
         const p = people.get(id) ?? makeUnknown(id);
         return new PersonNode({ ...p, _isShadow: true }, []);
       }
-      const raw = people.get(id) ?? makeUnknown(id);
-      if (collapseAbovePersonId != null && id === collapseAbovePersonId) {
-        return new PersonNode({ ...raw, _onlyRoot: gen === 0 }, []);
+      const raw = { ...(people.get(id) ?? makeUnknown(id)), _onlyRoot: gen === 0 };
+      const stopsHere = gen >= cap || (collapseAbovePersonId != null && id === collapseAbovePersonId);
+      let parentCap = cap;
+      if (stopsHere) {
+        if (!showParentsOf.has(id)) return new PersonNode({ ...raw, _hiddenCount: hiddenAncestors(id, gen) }, []);
+        parentCap = gen + 1;
       }
-      if (gen >= effectiveDepth) {
-        return new PersonNode({ ...raw, _onlyRoot: gen === 0 }, []);
-      }
-      const u = parentFamilyOf(id, gen);
-      if (!u) {
-        return new PersonNode({ ...raw, _onlyRoot: gen === 0 }, []);
-      }
+      const u = parentFamilyToClimb(graph, id, chosenFamilyFor(id, gen));
+      if (!u) return new PersonNode(raw, []);
 
       // A per-family placeholder partner (H4) counts as a missing parent here.
-      const known = (id: string | undefined) => {
-        const t = (id ?? "").trim();
-        return t && people.get(t)?._unknownPlaceholder !== true ? t : "";
-      };
       const h = known(u.husb);
       const w = known(u.wife);
-
-      if (!h && !w) {
-        return new PersonNode({ ...raw, _onlyRoot: gen === 0 }, []);
-      }
+      if (!h && !w) return new PersonNode(raw, []);
 
       visiting.add(id);
       try {
@@ -113,31 +114,27 @@ export class PedigreeChartBuilder implements ChartViewBuildAdapter {
         let rightNode: PersonNode;
 
         if (h && w && h !== w) {
-          leftNode = buildPerson(h, gen + 1);
-          rightNode = buildPerson(w, gen + 1);
+          leftNode = buildPerson(h, gen + 1, parentCap);
+          rightNode = buildPerson(w, gen + 1, parentCap);
         } else if (h && !w) {
-          leftNode = buildPerson(h, gen + 1);
+          leftNode = buildPerson(h, gen + 1, parentCap);
           rightNode = new PersonNode(unknownPlaceholder("mother", id), []);
         } else if (!h && w) {
           leftNode = new PersonNode(unknownPlaceholder("father", id), []);
-          rightNode = buildPerson(w, gen + 1);
+          rightNode = buildPerson(w, gen + 1, parentCap);
         } else {
-          const single = (h || w).trim();
-          leftNode = buildPerson(single, gen + 1);
-          rightNode =
-            h && w && h === w
-              ? new PersonNode(unknownPlaceholder("parent", `${id}_pair`), [])
-              : new PersonNode(unknownPlaceholder("parent", id), []);
+          leftNode = buildPerson(h || w, gen + 1, parentCap);
+          rightNode = new PersonNode(unknownPlaceholder("parent", `${id}_pair`), []);
         }
 
         const union = new NormalUnionNode(leftNode, rightNode, [], id);
-        return new PersonNode({ ...raw, _onlyRoot: gen === 0 }, [union]);
+        return new PersonNode(raw, [union]);
       } finally {
         visiting.delete(id);
       }
     };
 
-    const root = buildPerson(rootId, 0);
+    const root = buildPerson(rootId, 0, effectiveDepth);
     const maxDepthRendered = maxRenderedDepth(root, 0);
     return { root, maxDepthRendered };
   }

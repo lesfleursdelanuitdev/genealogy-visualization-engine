@@ -60,6 +60,9 @@ export {
   type SnapshotUnion,
   type SpouseLink,
   type PartnerRole,
+  countAncestors,
+  parentFamilyToClimb,
+  type AncestorClimbOptions,
 } from "./graph";
 
 export {

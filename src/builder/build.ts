@@ -42,6 +42,8 @@ export function buildTree(
   const maxDepthRendered = { current: 0 };
   /** True while a capped person's partner rows are built: their children are left out. */
   let childrenCapped = false;
+  /** Depth at which the current branch stops: maxDepth, or one row past an opened collapsed card. */
+  let branchCap = maxDepth;
 
   const ctx = {
     graph,
@@ -67,10 +69,26 @@ export function buildTree(
       const person = { ...basePerson, _onlyRoot: onlyRoot };
 
       if (strategy.isSubtreeCollapsed?.(personId)) {
-        return new PersonNode(person, []);
+        // A collapsed branch shows "+N" (T30); its chip opens one generation (showChildrenOf).
+        if (strategy.showsChildrenPastCap?.(personId) !== true) {
+          return new PersonNode({ ...person, _hiddenCount: getHiddenCount?.(personId) }, []);
+        }
+        const outerCap = branchCap;
+        branchCap = Math.min(branchCap, depth + 1);
+        try {
+          const unionNodes = strategy.buildUnionNodes(personId, depth, ctx);
+          if (unionNodes.length > 0) return new PersonNode(person, unionNodes);
+          const children = graph
+            .childrenOf(personId)
+            .map((id) => this.buildNode(id, depth + 1))
+            .filter((n): n is PersonNode => n != null);
+          return new PersonNode(person, children);
+        } finally {
+          branchCap = outerCap;
+        }
       }
 
-      if (depth >= maxDepth) {
+      if (depth >= branchCap) {
         // At the cap a person keeps their revealed partner rows, but their children are built
         // only when "Show children" asked for them (one more row, T18); otherwise +N.
         const showChildren = strategy.showsChildrenPastCap?.(personId) === true;

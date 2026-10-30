@@ -23,7 +23,12 @@ export interface DescendancyPerson {
   isLiving?: boolean;
   /** Display gender from data (e.g. "Male", "Female", "Unknown") for default icon. */
   gender?: string | null;
-  /** Set on leaf nodes at MAX_DEPTH to show +N hidden descendants badge. */
+  /**
+   * "+N" chip (T30): how many different people are hidden beyond this card in the chart's
+   * direction (descendants on the descendancy chart; ancestors on the pedigree, vertical
+   * pedigree and fan). Set on cards at the depth limit and on collapsed branches; each person
+   * counts once, however many lines lead to them. Unset elsewhere.
+   */
   _hiddenCount?: number;
   /** True when this person is shown again as a placeholder (e.g. adopted in another union). */
   _isShadow?: boolean;
@@ -88,6 +93,11 @@ export interface ViewState {
    * ("Show children" at the cap, T18). Below the cap it has no effect.
    */
   showChildrenOf?: string[];
+  /**
+   * Ancestor charts: cards whose "+N" chip was tapped (T30): their parents appear, one more
+   * generation for that branch only, past the depth limit or a collapse.
+   */
+  showParentsOf?: string[];
   /** When set, viewport should center on this person (used by history for "Pan to person" entries). */
   panToPersonId?: string;
   /** Person IDs whose subtrees are collapsed (descendants hidden). Stored as array for JSON-serializable state. */

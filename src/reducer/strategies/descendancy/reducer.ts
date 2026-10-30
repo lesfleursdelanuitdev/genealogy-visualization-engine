@@ -54,6 +54,8 @@ const handlers: Record<DescendancyAction["type"], Handler> = {
     const d = a as Extract<DescendancyAction, { type: "SHOW_CHILDREN" }>;
     return applyShowChildren(s, d.personId, d.atMaxDepth, d.currentDepth, graph);
   },
+  SHOW_HIDDEN: (s, a, graph) =>
+    applyShowChildren(s, (a as Extract<DescendancyAction, { type: "SHOW_HIDDEN" }>).personId, true, undefined, graph),
   SET_CURRENT_DEPTH: (s, a) =>
     applySetCurrentDepth(s, (a as Extract<DescendancyAction, { type: "SET_CURRENT_DEPTH" }>).depth),
   PAN_TO_PERSON: (s, a, graph) =>

@@ -10,3 +10,4 @@ export {
   type SpouseLink,
   type PartnerRole,
 } from "./GraphSnapshot";
+export { countAncestors, parentFamilyToClimb, type AncestorClimbOptions } from "./queries";
