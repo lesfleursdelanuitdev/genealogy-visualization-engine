@@ -60,10 +60,10 @@ const handlers: Record<DescendancyAction["type"], Handler> = {
     applySetCurrentDepth(s, (a as Extract<DescendancyAction, { type: "SET_CURRENT_DEPTH" }>).depth),
   PAN_TO_PERSON: (s, a, graph) =>
     applyPanToPerson(s, (a as Extract<DescendancyAction, { type: "PAN_TO_PERSON" }>).personId, graph),
-  COLLAPSE_SUBTREE: (s, a) =>
-    applyCollapseSubtree(s, (a as Extract<DescendancyAction, { type: "COLLAPSE_SUBTREE" }>).personId),
-  EXPAND_SUBTREE: (s, a) =>
-    applyExpandSubtree(s, (a as Extract<DescendancyAction, { type: "EXPAND_SUBTREE" }>).personId),
+  COLLAPSE_SUBTREE: (s, a, graph) =>
+    applyCollapseSubtree(s, (a as Extract<DescendancyAction, { type: "COLLAPSE_SUBTREE" }>).personId, graph),
+  EXPAND_SUBTREE: (s, a, graph) =>
+    applyExpandSubtree(s, (a as Extract<DescendancyAction, { type: "EXPAND_SUBTREE" }>).personId, graph),
   SET_FAMILY_UNIT_SCOPE: (s, a, graph) => {
     const d = a as Extract<DescendancyAction, { type: "SET_FAMILY_UNIT_SCOPE" }>;
     return applySetFamilyUnitScope(s, d.personId, d.spouseId, d.familyXref, graph);

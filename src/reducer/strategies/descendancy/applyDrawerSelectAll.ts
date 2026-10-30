@@ -23,7 +23,7 @@ export function applyDrawerSelectAll(
 ): TreeState {
   const vs = state.viewState as ViewState;
   const nextRevealed = new Map(vs.revealedUnions ?? []);
-  const allSpouseIds = graph.spousesOf(personId).map(({ spouseId }) => spouseId);
+  const allSpouseIds = [...new Set(graph.spousesOf(personId).map(({ spouseId }) => spouseId))];
   if (allSpouseIds.length > 0) nextRevealed.set(personId, allSpouseIds);
   const newViewState = { ...withoutFamilyUnitScope(vs), revealedUnions: nextRevealed };
   const personName = getFullName(graph, personId);

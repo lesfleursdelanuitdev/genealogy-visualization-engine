@@ -29,7 +29,8 @@ function buildAllRevealedUnions(graph: GraphSnapshot, rootId: string): Map<strin
     }
   }
   for (const personId of principals) {
-    const spouses = graph.spousesOf(personId).map(({ spouseId }) => spouseId);
+    // Once per partner (R1): a couple with two FAM records is one partner with two families.
+    const spouses = [...new Set(graph.spousesOf(personId).map(({ spouseId }) => spouseId))];
     if (spouses.length > 0) next.set(personId, spouses);
   }
   return next;

@@ -1,6 +1,6 @@
 /**
  * Action: SHOW_HIDDEN on an ancestor chart (T30) — the card's "+N" chip: show its parents, one
- * more generation for that branch only. Pushes a "Show ancestors" history entry.
+ * more generation for that branch only. Pushes a "Show more ancestors" history entry.
  */
 
 import type { TreeState } from "../../types";
@@ -15,7 +15,7 @@ export function applyShowAncestors(state: TreeState, personId: string, graph: Gr
   if (shown.includes(personId)) return state;
   const newViewState: ViewState = { ...v, showParentsOf: [...shown, personId] };
   const { fullName, initials } = getPersonDisplay(graph, personId);
-  const hist = pushHistory(state, state.rootId, newViewState, "Show ancestors", personId, {
+  const hist = pushHistory(state, state.rootId, newViewState, "Show more ancestors", personId, {
     triggerPersonId: personId,
     triggerPersonFullName: fullName,
     triggerPersonInitials: initials,

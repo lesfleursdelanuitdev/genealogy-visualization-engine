@@ -72,7 +72,9 @@ export class DescendancyViewStrategy implements ViewStrategy {
     const linkedUnions = this.viewState.linkedUnions ?? new Map<string, LinkedUnionEntry[]>();
     const siblingView = this.viewState.siblingView ?? null;
 
-    const spouseIds = revealedUnions.get(personId) ?? [];
+    // Each partner once (R1), even if a saved view state lists one twice; their FAM records
+    // are drawn as separate unions, one per family (B04).
+    const spouseIds = [...new Set(revealedUnions.get(personId) ?? [])];
     if (spouseIds.length === 0) return [];
 
     const xyScoped = this.buildXYLinkedNodesForPerson(

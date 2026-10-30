@@ -155,7 +155,7 @@ describe("tapping the chip (SHOW_HIDDEN)", () => {
     const g = graphOf(collapsedPedigree());
     const s1 = reduce(g, pedigreeState("X"), { type: "SHOW_HIDDEN", personId: "P" });
     expect((s1.viewState as ViewState).showParentsOf).toEqual(["P"]);
-    expect(s1.history[1]).toMatchObject({ actionLabel: "Show ancestors", triggerPersonId: "P", strategyName: "pedigree" });
+    expect(s1.history[1]).toMatchObject({ actionLabel: "Show more ancestors", triggerPersonId: "P", strategyName: "pedigree" });
     const cards = pedigreeCards(buildPedigree(g, "X", s1.viewState as ViewState, 1).root);
     expect(cards.get("G1")).toEqual({ gen: 2, hidden: 2 });
     expect(cards.get("G2")).toEqual({ gen: 2, hidden: 0 });

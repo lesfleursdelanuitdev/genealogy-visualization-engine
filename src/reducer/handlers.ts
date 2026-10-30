@@ -47,10 +47,11 @@ export const coreHandlers: Partial<Record<TreeAction["type"], Handler>> = {
     const x = a as Extract<TreeAction, { type: "PEDIGREE_SET_FAMC_FOR_PERSON" }>;
     return applyPedigreeSetFamcForPerson(s, x.personId, x.familyXref);
   },
-  PEDIGREE_COLLAPSE_ANCESTORS: (s, a) =>
+  PEDIGREE_COLLAPSE_ANCESTORS: (s, a, graph) =>
     applyPedigreeCollapseAncestors(
       s,
-      (a as Extract<TreeAction, { type: "PEDIGREE_COLLAPSE_ANCESTORS" }>).personId
+      (a as Extract<TreeAction, { type: "PEDIGREE_COLLAPSE_ANCESTORS" }>).personId,
+      graph
     ),
-  PEDIGREE_CLEAR_ANCESTOR_COLLAPSE: (s) => applyPedigreeClearAncestorCollapse(s),
+  PEDIGREE_CLEAR_ANCESTOR_COLLAPSE: (s, _a, graph) => applyPedigreeClearAncestorCollapse(s, graph),
 };
