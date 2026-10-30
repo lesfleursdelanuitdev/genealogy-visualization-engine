@@ -9,8 +9,9 @@ export interface PanZoomBounds {
   maxY: number;
 }
 
-const ZOOM_MIN = 0.2;
-const ZOOM_MAX = 3;
+/** Default zoom limits (R3): low enough for Fit to show a wide chart on a phone. */
+const DEFAULT_MIN_ZOOM = 0.05;
+const DEFAULT_MAX_ZOOM = 3;
 const ZOOM_STEP = 1.2;
 /** Initial scale when opening the chart (zoomed out a bit so more context is visible). */
 const INITIAL_SCALE = 0.72;
@@ -53,6 +54,16 @@ export interface UsePanZoomOptions {
    * keeps the user's pan and zoom, and the content stays where it was on screen.
    */
   viewKey?: string;
+  /** Smallest zoom (default 0.05). Wheel, pinch, buttons and Fit stay within the limits. */
+  minZoom?: number;
+  /** Largest zoom (default 3). */
+  maxZoom?: number;
+}
+
+/** Options for zoomIn / zoomOut. */
+export interface ZoomStepOptions {
+  /** Screen point (relative to the <svg>) to zoom around. Default: the viewport centre. */
+  focus?: { x: number; y: number };
 }
 
 /**
@@ -67,6 +78,8 @@ export function usePanZoom({
   deferLayoutOriginInitialPan = false,
   embedMode = false,
   viewKey,
+  minZoom = DEFAULT_MIN_ZOOM,
+  maxZoom = DEFAULT_MAX_ZOOM,
 }: UsePanZoomOptions) {
   const [pan, setPanState] = useState({ x: 0, y: 0 });
   const [scale, setScaleState] = useState(INITIAL_SCALE);
@@ -92,8 +105,14 @@ export function usePanZoom({
   const scaleRef = useRef(scale);
   const panRef = useRef(pan);
   const embedModeRef = useRef(embedMode);
+  const limitsRef = useRef({ min: minZoom, max: maxZoom });
   boundsRef.current = bounds;
   embedModeRef.current = embedMode;
+  limitsRef.current = { min: minZoom, max: maxZoom };
+  const clampZoom = useCallback(
+    (s: number) => Math.min(limitsRef.current.max, Math.max(limitsRef.current.min, s)),
+    []
+  );
 
   const setPan = useCallback((next: { x: number; y: number }) => {
     panRef.current = next;
@@ -135,18 +154,21 @@ export function usePanZoom({
     [setPan, setScale]
   );
 
-  /** Scale and pan that fit the bounds' width and height, centred horizontally (S3). */
+  /**
+   * Scale and pan that fit the bounds' width and height, centred horizontally (S3). Never above
+   * 100%, and within minZoom..maxZoom (R3: it used to stop at 25%).
+   */
   const fitView = useCallback((rect: { width: number }, b: PanZoomBounds, rectHeight: number) => {
     const tw = Math.max(1, b.maxX - b.minX);
     const th = b.maxY + 100;
     const fitScale = Math.min(1, Math.min((rect.width - 160) / tw, (rectHeight - 80) / th));
-    const s = Math.max(0.25, Math.min(1.2, fitScale));
+    const s = clampZoom(fitScale);
     const base = baseRef.current;
     return {
       scale: s,
       pan: { x: rect.width / 2 - base.x - ((b.minX + b.maxX) / 2) * s, y: INITIAL_TOP_PADDING - base.y },
     };
-  }, []);
+  }, [clampZoom]);
 
   // Initial view, once per viewKey, as soon as the SVG has a size.
   useEffect(() => {
@@ -180,8 +202,23 @@ export function usePanZoom({
     return () => ro.disconnect();
   }, [bounds, svgRef, deferLayoutOriginInitialPan, viewKey, fitView, setPan, setScale]);
 
-  const zoomIn = useCallback(() => setScale((s) => Math.min(ZOOM_MAX, s * ZOOM_STEP)), [setScale]);
-  const zoomOut = useCallback(() => setScale((s) => Math.max(ZOOM_MIN, s / ZOOM_STEP)), [setScale]);
+  /** One zoom step around `focus` (default: the viewport centre) (R5: it zoomed around the layout origin). */
+  const zoomStep = useCallback(
+    (factor: number, options?: ZoomStepOptions) => {
+      const s = scaleRef.current;
+      const ns = clampZoom(s * factor);
+      const rect = svgRef.current?.getBoundingClientRect();
+      if (!rect || rect.width <= 0 || rect.height <= 0) {
+        setScale(ns);
+        return;
+      }
+      const focus = options?.focus ?? { x: rect.width / 2, y: rect.height / 2 };
+      zoomAround(focus.x, focus.y, s, ns, panRef.current);
+    },
+    [svgRef, clampZoom, setScale, zoomAround]
+  );
+  const zoomIn = useCallback((options?: ZoomStepOptions) => zoomStep(ZOOM_STEP, options), [zoomStep]);
+  const zoomOut = useCallback((options?: ZoomStepOptions) => zoomStep(1 / ZOOM_STEP, options), [zoomStep]);
 
   /** Same view as initial load: root centered, near top, initial scale. */
   const goToInitialView = useCallback(() => {
@@ -254,10 +291,27 @@ export function usePanZoom({
     };
   }, []);
 
+  /** End the press or pan in progress without treating it as a tap (R4). */
+  const endDrag = useCallback(() => {
+    const d = dragRef.current;
+    if (!d) return;
+    dragRef.current = null;
+    const el = d.target;
+    if (el.hasPointerCapture?.(d.pointerId)) el.releasePointerCapture?.(d.pointerId);
+    if (capturedPointerRef.current?.id === d.pointerId) capturedPointerRef.current = null;
+    setDragging(false);
+  }, []);
+
   const onPointerMove = useCallback(
     (e: React.PointerEvent) => {
       const d = dragRef.current;
       if (!d || isPinchingRef.current || e.pointerId !== d.pointerId) return;
+      // A mouse or pen moving with no button down: the pointerup was lost (released outside
+      // the page, a dialog took it…). End the drag instead of panning on hover (R4).
+      if (e.buttons === 0 && e.pointerType !== "touch") {
+        endDrag();
+        return;
+      }
       const dx = e.clientX - d.startX;
       const dy = e.clientY - d.startY;
       if (!d.panning) {
@@ -270,7 +324,7 @@ export function usePanZoom({
       e.preventDefault();
       setPan({ x: d.startPan.x + dx, y: d.startPan.y + dy });
     },
-    [setPan]
+    [setPan, endDrag]
   );
 
   const onPointerUp = useCallback((e: React.PointerEvent) => {
@@ -295,7 +349,7 @@ export function usePanZoom({
       e.preventDefault();
       const rect = el.getBoundingClientRect();
       const s = scaleRef.current;
-      const ns = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, s * (1 - e.deltaY * 0.001)));
+      const ns = clampZoom(s * (1 - e.deltaY * 0.001));
       zoomAround(e.clientX - rect.left, e.clientY - rect.top, s, ns, panRef.current);
     };
 
@@ -329,7 +383,7 @@ export function usePanZoom({
       const center = getCenter(e.touches[0], e.touches[1]);
       const startScale = pinchStartScaleRef.current;
       const factor = getDist(e.touches[0], e.touches[1]) / pinchStartDistRef.current;
-      const ns = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, startScale * factor));
+      const ns = clampZoom(startScale * factor);
       // The layout point that was under the fingers' first midpoint follows the midpoint now:
       // pinch zooms around it and moving both fingers pans (T31).
       const start = pinchStartCenterRef.current;
@@ -361,7 +415,18 @@ export function usePanZoom({
     const previousTouchAction = el.style.touchAction;
     el.style.touchAction = "none";
 
+    // A drag always ends (R4): the browser cancelled the pointer, the captured element lost
+    // it, or the window lost focus with the button still down.
+    const onPointerCancel = () => endDrag();
+    const onLostCapture = (e: PointerEvent) => {
+      if (dragRef.current?.pointerId === e.pointerId) endDrag();
+    };
+    const onWindowBlur = () => endDrag();
+
     el.addEventListener("click", onClickCapture, true);
+    el.addEventListener("pointercancel", onPointerCancel);
+    el.addEventListener("lostpointercapture", onLostCapture);
+    window.addEventListener("blur", onWindowBlur);
     el.addEventListener("wheel", onWheel, { passive: false });
     el.addEventListener("touchstart", onTouchStart, { passive: false });
     el.addEventListener("touchmove", onTouchMove, { passive: false });
@@ -370,13 +435,16 @@ export function usePanZoom({
     return () => {
       el.style.touchAction = previousTouchAction;
       el.removeEventListener("click", onClickCapture, true);
+      el.removeEventListener("pointercancel", onPointerCancel);
+      el.removeEventListener("lostpointercapture", onLostCapture);
+      window.removeEventListener("blur", onWindowBlur);
       el.removeEventListener("wheel", onWheel);
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("touchend", onTouchEnd);
       el.removeEventListener("touchcancel", onTouchEnd);
     };
-  }, [svgRef, zoomAround]);
+  }, [svgRef, zoomAround, clampZoom, endDrag]);
 
   return {
     pan,

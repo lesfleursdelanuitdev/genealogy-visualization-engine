@@ -46,6 +46,8 @@ The engine now stands alone: its one input is a `GraphSnapshot` of the whole fam
 - `personWidth` now changes node spacing and bounds, and `getConnectors(personHeight, personWidth?)` / the pedigree connectors honour the card size. `Node.computedWidth(gap, personWidth?)`.
 - `_hiddenCount` now means "distinct people hidden beyond this card in the chart's direction" and is set on all four charts (see Added).
 - `usePanZoom` no longer returns `onWheel`: it adds its own non-passive wheel listener. Remove `onWheel={onWheel}` from the `<svg>`, or every notch zooms twice. It sets `touch-action: none` on the `<svg>`. Pass `viewKey` (e.g. chart type + root) so the initial view applies once per chart; a bounds change alone now keeps the zoom and keeps the content still.
+- Zoom limits are options, `minZoom` (default **0.05**, was a fixed 0.2) and `maxZoom` (default 3). Fit picks the zoom that fits (never above 100%) within the limits; it used to stop at 25%, so a wide chart overflowed a phone.
+- `zoomIn` / `zoomOut` zoom around the viewport centre (they zoomed around the layout origin) and take `{ focus: { x, y } }` for another screen point. Wire them as `onClick={() => zoomIn()}`, not `onClick={zoomIn}`.
 
 **Package**
 - `main`, `types` and `exports` point at `dist/`. Only `.` and `./package.json` are exported (the `./*` → `src/*` subpath export is gone). `dist/` is ESM with extensionless imports, for bundlers only (Vite, Next, webpack, vitest), not bare Node (T22).
@@ -54,7 +56,7 @@ The engine now stands alone: its one input is a `GraphSnapshot` of the whole fam
 ### History entries (the Gonsalves app restores saved entries)
 
 `HistoryEntry`'s fields are unchanged; BACK, FORWARD, NAVIGATE_TO_INDEX, CLEAR_HISTORY, RESTORE_HISTORY, `MAX_HISTORY` (21) and `strategyName` per entry work as before (`test/history.test.ts`). What changes:
-- New entries: `CLOSE_SPOUSE` pushes **"Close partner"** (it pushed nothing); the "+N" chip on the ancestor charts pushes **"Show ancestors"**.
+- New entries: `CLOSE_SPOUSE` pushes **"Close partner"** (it pushed nothing); the "+N" chip on the ancestor charts pushes **"Show more ancestors"**; `COLLAPSE_SUBTREE` / `EXPAND_SUBTREE` push **"Hide descendants of X"** / **"Show descendants of X"**, and `PEDIGREE_COLLAPSE_ANCESTORS` / `PEDIGREE_CLEAR_ANCESTOR_COLLAPSE` push **"Hide ancestors of X"** / **"Show ancestors of X"** (all four pushed nothing; T28). A collapse or expand that changes nothing adds no entry.
 - Show children at the depth cap pushes **"Show children"** with the trigger person and no longer changes the root (it pushed "Show children, make X root" with `rootPersonFullName`/`rootPersonInitials`).
 - `viewState` inside entries: `expandDownTopRow` is gone (ignored when an old entry is restored), `showChildrenOf` / `showParentsOf` may appear, and `panToPersonId` stays only on its own "Pan to person" entry instead of being copied into every later entry.
 - An unknown partner is `<familyId>:unknown-husb` / `-wife` in `revealedUnions`. Old saved entries that reveal `""` still work: `""` matches that family's placeholder. (`familyUnitScope.spouseId` and `linkedUnions` with `""` are not mapped.)
@@ -71,13 +73,15 @@ The engine now stands alone: its one input is a `GraphSnapshot` of the whole fam
 - **"+N" on all four charts (T30):** cards at the depth limit and on a collapsed branch get `_hiddenCount`, the number of distinct people beyond them (descendants, or ancestors on Ancestors, Ancestors (vertical) and Fan). `SHOW_HIDDEN { personId }` is the chip: one more generation for that branch.
 - **Show children at the cap (T18)** shows that person's children one row deeper, for that branch only.
 - Search: `searchPeople(graph, query, { offset, limit })` (names and 4-digit years, sorted, 10 per page) and `createGraphIndividualsSearch(graph)`; `useChartSearch` passes years and paging through.
-- Two FAM records for one couple each get their own union row.
+- Two FAM records for one couple each get their own union row; the partner is listed once (R1).
 
 ### Fixed (2026-10-17 audit; repros in `test/bugs/`)
 
 H1 global builder shared by every chart · H2 a late answer replaced the current chart · H3 O(N²) descendancy build (6,826 people: 1.3 s → about 60 ms) · H4 one shared "Unknown" for every unknown partner · B01 wheel/pinch zoom drifted (ignored baseX/baseY) · B02 passive wheel listener · B03 Show children at the cap re-rooted · B04 second FAM of a couple lost its children · B05 "+N" counts path-dependent and double-counted · B06 `personWidth`/`personHeight` ignored by spacing, bounds and pedigree connectors · B07 a fast answer left the chart loading · B08 bounds changes reset the zoom · B09 CLOSE_SPOUSE closed the wrong row · B10 depth not clamped; revealed rows passed the cap · B11 fan bounds · B12 initials split UTF-16 pairs · B13 the pedigree ignored the chosen parent family · B14 missing `isLiving` treated as dead · B15 `console.log` in production · S1 re-rooting kept the old family-unit scope · S2 `panToPersonId` never cleared · S3 fit to screen ignored the centre. (S4, sibling order, did not reproduce: children keep CHIL order, T21.)
 
 Also: `process.env` is read only in `src/env.ts`, guarded, so the engine loads under Vite; one-finger pan, taps on card buttons and two-finger pinch are phone-safe (T31).
+
+Found by the renderer's slice 1: R1 Toggle all partners / Show all listed a partner once per FAM record (4 rows for a couple with 2 FAMs) · R2 collapse/expand added no History entry · R3 zoom limits fixed at 20–300% · R4 a drag whose pointerup never came kept panning on hover (now ended by `pointercancel`, `lostpointercapture`, window blur, or a mouse/pen move with no button) · R5 zoom buttons zoomed around the layout origin.
 
 ### Tooling
 

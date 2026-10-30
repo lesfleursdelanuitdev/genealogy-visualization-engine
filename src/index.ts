@@ -196,6 +196,7 @@ export {
   type UsePanToPersonOptions,
   type UsePanToPersonResult,
   type UsePanZoomOptions,
+  type ZoomStepOptions,
   type UseSpouseDrawerResult,
   type UseTreeBuildOptions,
   type TreeBuildResult,

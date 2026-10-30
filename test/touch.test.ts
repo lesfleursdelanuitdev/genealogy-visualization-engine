@@ -29,14 +29,28 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function useHarness() {
+interface HarnessProps {
+  bounds?: PanZoomBounds;
+  baseX?: number;
+  minZoom?: number;
+  maxZoom?: number;
+}
+
+function useHarness(p: HarnessProps | undefined) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const pz = usePanZoom({ svgRef, bounds: BOUNDS, baseX: BASE.x, baseY: BASE.y });
+  const pz = usePanZoom({
+    svgRef,
+    bounds: p?.bounds ?? BOUNDS,
+    baseX: p?.baseX ?? BASE.x,
+    baseY: BASE.y,
+    minZoom: p?.minZoom,
+    maxZoom: p?.maxZoom,
+  });
   return { svgRef, pz };
 }
 
-async function renderChart(onCardButton = () => {}) {
-  const h = await renderHook(useHarness, undefined, (r) =>
+async function renderChart(onCardButton = () => {}, props?: HarnessProps) {
+  const h = await renderHook(useHarness, props, (r) =>
     // Same wiring as the Gonsalves ChartViewport: pointer handlers on the <svg>, cards inside.
     createElement(
       "svg",
@@ -54,11 +68,17 @@ async function renderChart(onCardButton = () => {}) {
   return { h, svg, card: h.container.querySelector("rect")!, button: h.container.querySelector("button")! };
 }
 
-function pointer(type: string, x: number, y: number, id = 1): Event {
+function pointer(
+  type: string,
+  x: number,
+  y: number,
+  id = 1,
+  opts: { pointerType?: string; buttons?: number } = {}
+): Event {
   const Ctor = typeof PointerEvent === "function" ? PointerEvent : MouseEvent;
-  const e = new Ctor(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 });
+  const e = new Ctor(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, buttons: opts.buttons ?? 1 });
   if (!("pointerId" in e) || (e as PointerEvent).pointerId !== id) Object.defineProperty(e, "pointerId", { value: id });
-  Object.defineProperty(e, "pointerType", { value: "touch" });
+  Object.defineProperty(e, "pointerType", { value: opts.pointerType ?? "touch" });
   return e;
 }
 
@@ -164,7 +184,7 @@ describe("two fingers", () => {
     await h.unmount();
   });
 
-  it("pinch out and in stop at the zoom limits (3 and 0.2)", async () => {
+  it("pinch out and in stop at the default zoom limits (3 and 0.05)", async () => {
     const { h, svg } = await renderChart();
     await act(async () => {
       svg.dispatchEvent(touch("touchstart", [[190, 400], [210, 400]]));
@@ -176,7 +196,7 @@ describe("two fingers", () => {
       svg.dispatchEvent(touch("touchstart", [[0, 400], [390, 400]]));
       svg.dispatchEvent(touch("touchmove", [[195, 400], [196, 400]])); // ÷390
     });
-    expect(h.current.pz.scale).toBeCloseTo(0.2, 10);
+    expect(h.current.pz.scale).toBeCloseTo(0.05, 10);
     await h.unmount();
   });
 
@@ -232,6 +252,135 @@ describe("nothing leaks to the page", () => {
       card.dispatchEvent(move);
     });
     expect(move.defaultPrevented).toBe(true);
+    await h.unmount();
+  });
+});
+
+// ─── renderer slice 1 findings R3–R5 (viz-react docs/extraction-plan.md §9) ─────
+
+describe("R3: zoom limits are options", () => {
+  it("minZoom and maxZoom bound pinch and the zoom buttons", async () => {
+    const { h, svg } = await renderChart(undefined, { minZoom: 0.5, maxZoom: 2 });
+    await act(async () => {
+      svg.dispatchEvent(touch("touchstart", [[190, 400], [210, 400]]));
+      svg.dispatchEvent(touch("touchmove", [[0, 400], [390, 400]]));
+    });
+    expect(h.current.pz.scale).toBe(2);
+    await act(async () => {
+      for (let i = 0; i < 10; i++) h.current.pz.zoomOut();
+    });
+    expect(h.current.pz.scale).toBe(0.5);
+    await h.unmount();
+  });
+
+  it("on a phone, Fit shows a wide chart whole (it used to stop at 25%)", async () => {
+    const wide: PanZoomBounds = { minX: 0, maxX: 3000, maxY: 600 };
+    const base = { x: 80, y: BASE.y };
+    const { h } = await renderChart(undefined, { bounds: wide, baseX: base.x });
+    await act(async () => h.current.pz.fitToScreen());
+    const s = h.current.pz.scale;
+    expect(s).toBeLessThan(0.25);
+    expect(base.x + h.current.pz.pan.x + wide.minX * s).toBeGreaterThanOrEqual(0);
+    expect(base.x + h.current.pz.pan.x + wide.maxX * s).toBeLessThanOrEqual(390);
+    await h.unmount();
+  });
+
+  it("Fit stays within the limits", async () => {
+    const wide: PanZoomBounds = { minX: 0, maxX: 3000, maxY: 600 };
+    const { h } = await renderChart(undefined, { bounds: wide, baseX: 80, minZoom: 0.1 });
+    await act(async () => h.current.pz.fitToScreen());
+    expect(h.current.pz.scale).toBe(0.1);
+    await h.unmount();
+  });
+});
+
+describe("R4: a drag always ends", () => {
+  async function startPan() {
+    const r = await renderChart();
+    await act(async () => {
+      r.card.dispatchEvent(pointer("pointerdown", 100, 100));
+      r.card.dispatchEvent(pointer("pointermove", 140, 100));
+    });
+    expect(r.h.current.pz.dragging).toBe(true);
+    return r;
+  }
+
+  async function expectNoMorePanning(r: Awaited<ReturnType<typeof renderChart>>) {
+    expect(r.h.current.pz.dragging).toBe(false);
+    const panned = { ...r.h.current.pz.pan };
+    await act(async () => {
+      r.card.dispatchEvent(pointer("pointermove", 300, 300));
+    });
+    expect(r.h.current.pz.pan).toEqual(panned);
+    await r.h.unmount();
+  }
+
+  it("on pointercancel", async () => {
+    const r = await startPan();
+    await act(async () => {
+      r.card.dispatchEvent(pointer("pointercancel", 140, 100));
+    });
+    await expectNoMorePanning(r);
+  });
+
+  it("on lostpointercapture", async () => {
+    const r = await startPan();
+    await act(async () => {
+      r.card.dispatchEvent(pointer("lostpointercapture", 140, 100));
+    });
+    await expectNoMorePanning(r);
+  });
+
+  it("when the window loses focus", async () => {
+    const r = await startPan();
+    await act(async () => {
+      window.dispatchEvent(new Event("blur"));
+    });
+    await expectNoMorePanning(r);
+  });
+
+  it("on a mouse move with no button pressed (the pointerup never came)", async () => {
+    const r = await renderChart();
+    await act(async () => {
+      r.card.dispatchEvent(pointer("pointerdown", 100, 100, 1, { pointerType: "mouse" }));
+      r.card.dispatchEvent(pointer("pointermove", 140, 100, 1, { pointerType: "mouse" }));
+    });
+    expect(r.h.current.pz.pan).toEqual({ x: 40, y: 0 });
+    await act(async () => {
+      r.card.dispatchEvent(pointer("pointermove", 300, 300, 1, { pointerType: "mouse", buttons: 0 }));
+    });
+    expect(r.h.current.pz.dragging).toBe(false);
+    expect(r.h.current.pz.pan).toEqual({ x: 40, y: 0 });
+    await r.h.unmount();
+  });
+});
+
+describe("R5: zoom in and out around a point", () => {
+  const VIEW_CENTRE = { x: 195, y: 400 };
+
+  it("zoomIn() and zoomOut() keep the viewport centre still", async () => {
+    const { h } = await renderChart();
+    const under = { x: VIEW_CENTRE.x - BASE.x, y: VIEW_CENTRE.y - BASE.y }; // pan 0, scale 1
+    await act(async () => h.current.pz.zoomIn());
+    expect(h.current.pz.scale).toBeCloseTo(1.2, 10);
+    let at = screenOf(h.current.pz, under.x, under.y);
+    expect(at.x).toBeCloseTo(VIEW_CENTRE.x, 6);
+    expect(at.y).toBeCloseTo(VIEW_CENTRE.y, 6);
+    await act(async () => h.current.pz.zoomOut());
+    at = screenOf(h.current.pz, under.x, under.y);
+    expect(h.current.pz.scale).toBeCloseTo(1, 10);
+    expect(at.x).toBeCloseTo(VIEW_CENTRE.x, 6);
+    await h.unmount();
+  });
+
+  it("zoomIn({ focus }) keeps that screen point still", async () => {
+    const { h } = await renderChart();
+    const focus = { x: 50, y: 120 };
+    const under = { x: focus.x - BASE.x, y: focus.y - BASE.y };
+    await act(async () => h.current.pz.zoomIn({ focus }));
+    const at = screenOf(h.current.pz, under.x, under.y);
+    expect(at.x).toBeCloseTo(focus.x, 6);
+    expect(at.y).toBeCloseTo(focus.y, 6);
     await h.unmount();
   });
 });
