@@ -10,4 +10,19 @@ export {
   type SpouseLink,
   type PartnerRole,
 } from "./GraphSnapshot";
-export { countAncestors, parentFamilyToClimb, type AncestorClimbOptions } from "./queries";
+export {
+  countAncestors,
+  countDescendantsWithin,
+  parentFamilyToClimb,
+  birthFamilyOf,
+  defaultFamc,
+  parentFamiliesOf,
+  hasMultipleParentFamilies,
+  multiFamilyChildIds,
+  siblingsOf,
+  familiesAsPartnerOf,
+  computeSiblingView,
+  type AncestorClimbOptions,
+  type ParentFamily,
+  type ComputedSiblingView,
+} from "./queries";

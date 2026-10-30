@@ -3,35 +3,27 @@ import type { TreeState } from "../../types";
 import type { ViewState } from "../../../types";
 import { pushHistory } from "../../pushHistory";
 import { initialLetters } from "../../personText";
+import { computeSiblingView } from "../../../graph/queries";
 
 /**
- * Sets root and minimal siblingView (personId + placeholder arrays).
- * Catch-alls are filled when the sibling-view API response arrives (SET_SIBLING_VIEW_FROM_API).
+ * Show parents & siblings of `personId`: root at the birth father (else the mother), reveal the
+ * other birth parent, and fill the sibling view from the graph (computeSiblingView). The
+ * Gonsalves app may still replace the meta with its route's (SET_SIBLING_VIEW_FROM_API).
  */
 export function applyShowSiblings(state: TreeState, personId: string, graph: GraphSnapshot): TreeState {
-  const parentUnions = graph.parentUnionsOf(personId);
-  if (parentUnions.length === 0) return state;
+  const computed = computeSiblingView(graph, personId);
+  if (!computed) return state;
 
-  const birthUnion = graph.birthUnionByChild.get(personId) ?? parentUnions[0];
-
-  const newRoot = birthUnion.husb;
-  const otherParent = birthUnion.wife;
-
+  const newRoot = computed.rootId;
   const nextRevealed = new Map<string, string[]>();
-  const existing = nextRevealed.get(newRoot) ?? [];
-  if (!existing.includes(otherParent)) nextRevealed.set(newRoot, [...existing, otherParent]);
+  if (computed.partnerId) nextRevealed.set(newRoot, [computed.partnerId]);
 
   const newViewState: ViewState = {
     revealedUnions: nextRevealed,
     linkedUnions: new Map(),
     displayDepth: undefined,
     currentDepth: undefined,
-    siblingView: {
-      personId,
-      spouseCatchAlls: [],
-      adoptiveUnions: [],
-      adoptiveCatchAlls: [],
-    },
+    siblingView: computed.siblingView,
   };
 
   const people = graph.people;

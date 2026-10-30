@@ -61,8 +61,19 @@ export {
   type SpouseLink,
   type PartnerRole,
   countAncestors,
+  countDescendantsWithin,
   parentFamilyToClimb,
+  birthFamilyOf,
+  defaultFamc,
+  parentFamiliesOf,
+  hasMultipleParentFamilies,
+  multiFamilyChildIds,
+  siblingsOf,
+  familiesAsPartnerOf,
+  computeSiblingView,
   type AncestorClimbOptions,
+  type ParentFamily,
+  type ComputedSiblingView,
 } from "./graph";
 
 export {
