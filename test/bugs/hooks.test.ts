@@ -8,7 +8,6 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, createElement, useRef } from "react";
-import { knownBug } from "../helpers/bugs";
 import { renderHook, settle } from "../helpers/renderHook";
 import { usePanZoom, useDepth, type PanZoomBounds } from "../../src";
 
@@ -41,11 +40,12 @@ interface PanZoomProps {
   bounds: PanZoomBounds;
   baseX: number;
   baseY: number;
+  viewKey?: string;
 }
 
 function usePanZoomHarness(p: PanZoomProps) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const pz = usePanZoom({ svgRef, bounds: p.bounds, baseX: p.baseX, baseY: p.baseY });
+  const pz = usePanZoom({ svgRef, bounds: p.bounds, baseX: p.baseX, baseY: p.baseY, viewKey: p.viewKey });
   return { svgRef, pz };
 }
 
@@ -59,8 +59,8 @@ async function renderPanZoom(props: PanZoomProps) {
     }
   );
   const h = await renderHook(usePanZoomHarness, props, (r) =>
-    // Same wiring as Gonsalves ChartViewport: React onWheel on the <svg>.
-    createElement("svg", { ref: r.svgRef, onWheel: r.pz.onWheel })
+    // The hook attaches its own non-passive wheel listener (B02), so the <svg> needs only the ref.
+    createElement("svg", { ref: r.svgRef })
   );
   await settle();
   const svg = h.container.querySelector("svg");
@@ -90,7 +90,7 @@ async function resetView(pz: { setPan(p: { x: number; y: number }): void; setSca
 }
 
 describe("B01: zoom keeps the point under the pointer", () => {
-  knownBug("B01", "wheel zoom keeps the layout point under the mouse in place", async () => {
+  it("[B01 fixed] wheel zoom keeps the layout point under the mouse in place", async () => {
     const { h, svg } = await renderPanZoom(panZoomProps);
     await resetView(h.current.pz);
     const mouse = { x: 400, y: 300 };
@@ -109,7 +109,7 @@ describe("B01: zoom keeps the point under the pointer", () => {
     await h.unmount();
   });
 
-  knownBug("B01", "pinch zoom keeps the layout point under the fingers in place", async () => {
+  it("[B01 fixed] pinch zoom keeps the layout point under the fingers in place", async () => {
     const { h, svg } = await renderPanZoom(panZoomProps);
     await resetView(h.current.pz);
     const touchEvent = (type: string, xs: [number, number]) => {
@@ -136,7 +136,7 @@ describe("B01: zoom keeps the point under the pointer", () => {
 });
 
 describe("B02: wheel listener", () => {
-  knownBug("B02", "the wheel handler can cancel page scrolling (non-passive listener)", async () => {
+  it("[B02 fixed] the wheel handler can cancel page scrolling (non-passive listener)", async () => {
     const { h, svg } = await renderPanZoom(panZoomProps);
     const wheel = new WheelEvent("wheel", { deltaY: -100, clientX: 10, clientY: 10, bubbles: true, cancelable: true });
     await act(async () => {
@@ -148,7 +148,7 @@ describe("B02: wheel listener", () => {
 });
 
 describe("B08: bounds changes", () => {
-  knownBug("B08", "a change of bounds (e.g. a partner revealed) keeps the user's zoom", async () => {
+  it("[B08 fixed] a change of bounds (e.g. a partner revealed) keeps the user's zoom", async () => {
     const { h } = await renderPanZoom(panZoomProps);
     await act(async () => {
       h.current.pz.setScale(2);
@@ -161,7 +161,7 @@ describe("B08: bounds changes", () => {
 });
 
 describe("S3 (suspected): fit to screen", () => {
-  knownBug("S3", "fit to screen puts the whole chart width inside the viewport", async () => {
+  it("[S3 fixed] fit to screen puts the whole chart width inside the viewport", async () => {
     const bounds: PanZoomBounds = { minX: 0, maxX: 2000, maxY: 1000 };
     const base = { x: 80, y: 80 };
     const { h } = await renderPanZoom({ bounds, baseX: base.x, baseY: base.y });
@@ -176,8 +176,37 @@ describe("S3 (suspected): fit to screen", () => {
   });
 });
 
+describe("bounds changes keep the view", () => {
+  it("a layout point stays where it was on screen when baseX/baseY change", async () => {
+    const { h } = await renderPanZoom(panZoomProps);
+    await act(async () => {
+      h.current.pz.setScale(1.5);
+      h.current.pz.setPan({ x: 20, y: -40 });
+    });
+    const before = toScreen(h.current.pz, BASE, 100, 200);
+    const newBase = { x: BASE.x + 370, y: BASE.y };
+    await h.rerender({ bounds: { ...BOUNDS, minX: BOUNDS.minX - 370 }, baseX: newBase.x, baseY: newBase.y });
+    await settle();
+    const after = toScreen(h.current.pz, newBase, 100, 200);
+    expect(after.x).toBeCloseTo(before.x, 6);
+    expect(after.y).toBeCloseTo(before.y, 6);
+    await h.unmount();
+  });
+
+  it("a new viewKey (another root or chart) applies the initial view again", async () => {
+    const { h } = await renderPanZoom({ ...panZoomProps, viewKey: "a" });
+    await act(async () => {
+      h.current.pz.setScale(2);
+    });
+    await h.rerender({ ...panZoomProps, viewKey: "b" });
+    await settle();
+    expect(h.current.pz.scale).toBe(0.72);
+    await h.unmount();
+  });
+});
+
 describe("B15: no console.log in production", () => {
-  knownBug("B15", "changing the depth from the dropdown logs nothing", async () => {
+  it("[B15 fixed] changing the depth from the dropdown logs nothing", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const h = await renderHook(
       () => useDepth({ dispatch: () => {}, viewState: {}, maxDepthRendered: 0, graph: null }),

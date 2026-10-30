@@ -1,8 +1,7 @@
 /**
  * Audit bugs in the card-action helper. IDs follow docs/v0.1.0-progress.md ("Bug list").
  */
-import { describe, expect, vi, afterEach } from "vitest";
-import { knownBug } from "../helpers/bugs";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { handlePersonCardAction, EMPTY_GRAPH, type HandlePersonCardActionContext } from "../../src";
 
 function context(): HandlePersonCardActionContext {
@@ -27,7 +26,7 @@ function context(): HandlePersonCardActionContext {
 afterEach(() => vi.restoreAllMocks());
 
 describe("B15: no console.log in production", () => {
-  knownBug("B15", "the Show children card action logs nothing", () => {
+  it("[B15 fixed] the Show children card action logs nothing", () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     handlePersonCardAction("expandDown", "C1", context());
     expect(log).not.toHaveBeenCalled();

@@ -3,7 +3,6 @@
  * IDs follow docs/v0.1.0-progress.md ("Bug list").
  */
 import { describe, it, expect } from "vitest";
-import { knownBug } from "../helpers/bugs";
 import { wideFamily } from "../helpers/fixtures";
 import {
   graphOf,

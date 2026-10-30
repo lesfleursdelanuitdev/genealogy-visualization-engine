@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { PERSON_WIDTH } from "../strategies/descendancy/constants";
 
 export interface PanZoomBounds {
@@ -29,8 +29,18 @@ export interface UsePanZoomOptions {
   deferLayoutOriginInitialPan?: boolean;
   /** When true, use fit-to-screen for initial view (non-pedigree) or left-align root (pedigree via embedCenterOnPosition). */
   embedMode?: boolean;
+  /**
+   * What the chart shows, e.g. `${chartType}:${rootId}`. The initial view is applied once, and
+   * again only when this changes. A bounds change alone (a partner revealed, a branch opened)
+   * keeps the user's pan and zoom, and the content stays where it was on screen.
+   */
+  viewKey?: string;
 }
 
+/**
+ * Pan and zoom for a chart drawn at `translate(baseX + pan.x, baseY + pan.y) scale(scale)`:
+ * layout point L appears on screen at base + pan + L · scale.
+ */
 export function usePanZoom({
   svgRef,
   bounds,
@@ -38,43 +48,86 @@ export function usePanZoom({
   baseY,
   deferLayoutOriginInitialPan = false,
   embedMode = false,
+  viewKey,
 }: UsePanZoomOptions) {
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [scale, setScale] = useState(INITIAL_SCALE);
+  const [pan, setPanState] = useState({ x: 0, y: 0 });
+  const [scale, setScaleState] = useState(INITIAL_SCALE);
   const [dragging, setDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [panAtDrag, setPanAtDrag] = useState({ x: 0, y: 0 });
   const hasSetInitialView = useRef(false);
   const boundsRef = useRef(bounds);
-  const baseXRef = useRef(baseX);
-  const baseYRef = useRef(baseY);
-  /** When bounds identity changes (e.g. real tree replaces placeholder), allow applying initial view again */
-  const boundsKeyRef = useRef<string | null>(null);
+  const baseRef = useRef({ x: baseX, y: baseY });
+  const viewKeyRef = useRef<string | undefined>(viewKey);
   /** Pinch-to-zoom (mobile): avoid applying single-finger pan while two fingers are down */
   const isPinchingRef = useRef(false);
   const pinchStartDistRef = useRef<number | null>(null);
-  const pinchStartCenterRef = useRef<{ x: number; y: number } | null>(null);
   const pinchStartScaleRef = useRef(INITIAL_SCALE);
   const pinchStartPanRef = useRef({ x: 0, y: 0 });
   /** Tracks the element + pointer ID for the captured single-finger pointer so it can be released when a pinch starts. */
   const capturedPointerRef = useRef<{ el: Element; id: number } | null>(null);
+  // Refs follow every change at once, so several wheel or touch events between two renders
+  // build on each other instead of on a stale value.
   const scaleRef = useRef(scale);
   const panRef = useRef(pan);
   const embedModeRef = useRef(embedMode);
   boundsRef.current = bounds;
-  baseXRef.current = baseX;
-  baseYRef.current = baseY;
-  scaleRef.current = scale;
-  panRef.current = pan;
   embedModeRef.current = embedMode;
-  const boundsKey = bounds ? `${bounds.minX},${bounds.maxX},${bounds.maxY}` : null;
-  if (boundsKey !== boundsKeyRef.current) {
-    boundsKeyRef.current = boundsKey;
+
+  const setPan = useCallback((next: { x: number; y: number }) => {
+    panRef.current = next;
+    setPanState(next);
+  }, []);
+  const setScale = useCallback((next: number | ((s: number) => number)) => {
+    const value = typeof next === "function" ? next(scaleRef.current) : next;
+    scaleRef.current = value;
+    setScaleState(value);
+  }, []);
+
+  if (viewKey !== viewKeyRef.current) {
+    viewKeyRef.current = viewKey;
     hasSetInitialView.current = false;
   }
 
-  // When chart has bounds and viewport size, position like fit-to-screen (root near top, centered) at initial zoom.
-  // Use ResizeObserver so we run once the SVG has real dimensions. Re-run when bounds change (e.g. real tree loads).
+  // Keep the content still when the base offset moves (B08): base + pan stays the same.
+  useLayoutEffect(() => {
+    const prev = baseRef.current;
+    baseRef.current = { x: baseX, y: baseY };
+    if (!hasSetInitialView.current) return;
+    const dx = baseX - prev.x;
+    const dy = baseY - prev.y;
+    if (dx === 0 && dy === 0) return;
+    setPan({ x: panRef.current.x - dx, y: panRef.current.y - dy });
+  }, [baseX, baseY, setPan]);
+
+  /** Zoom from `fromScale` to `toScale` keeping screen point (mx, my) over the same layout point. */
+  const zoomAround = useCallback(
+    (mx: number, my: number, fromScale: number, toScale: number, fromPan: { x: number; y: number }) => {
+      const r = toScale / fromScale;
+      const b = baseRef.current;
+      setPan({
+        x: mx - b.x - r * (mx - b.x - fromPan.x),
+        y: my - b.y - r * (my - b.y - fromPan.y),
+      });
+      setScale(toScale);
+    },
+    [setPan, setScale]
+  );
+
+  /** Scale and pan that fit the bounds' width and height, centred horizontally (S3). */
+  const fitView = useCallback((rect: { width: number }, b: PanZoomBounds, rectHeight: number) => {
+    const tw = Math.max(1, b.maxX - b.minX);
+    const th = b.maxY + 100;
+    const fitScale = Math.min(1, Math.min((rect.width - 160) / tw, (rectHeight - 80) / th));
+    const s = Math.max(0.25, Math.min(1.2, fitScale));
+    const base = baseRef.current;
+    return {
+      scale: s,
+      pan: { x: rect.width / 2 - base.x - ((b.minX + b.maxX) / 2) * s, y: INITIAL_TOP_PADDING - base.y },
+    };
+  }, []);
+
+  // Initial view, once per viewKey, as soon as the SVG has a size.
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg || !bounds) return;
@@ -86,47 +139,28 @@ export function usePanZoom({
       const rect = svg.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return;
       hasSetInitialView.current = true;
-      if (deferLayoutOriginInitialPan) {
-        return;
-      }
-      if (embedModeRef.current) {
-        const tw = b.maxX - b.minX;
-        const th = b.maxY + 100;
-        const fitScale = Math.min(1, Math.min((rect.width - 160) / tw, (rect.height - 80) / th));
-        const s = Math.max(0.25, Math.min(1.2, fitScale));
-        const px = rect.width / 2 - baseXRef.current;
-        const py = INITIAL_TOP_PADDING - baseYRef.current;
-        requestAnimationFrame(() => {
-          setPan({ x: px, y: py });
-          setScale(s);
-        });
-        return;
-      }
-      const px = rect.width / 2 - baseXRef.current;
-      const py = INITIAL_TOP_PADDING - baseYRef.current;
+      if (deferLayoutOriginInitialPan) return;
+      const view = embedModeRef.current
+        ? fitView(rect, b, rect.height)
+        : {
+            scale: INITIAL_SCALE,
+            pan: { x: rect.width / 2 - baseRef.current.x, y: INITIAL_TOP_PADDING - baseRef.current.y },
+          };
       // Defer so layout is complete (SVG may not have final size in same frame)
       requestAnimationFrame(() => {
-        setPan({ x: px, y: py });
-        setScale(INITIAL_SCALE);
+        setPan(view.pan);
+        setScale(view.scale);
       });
     };
 
     applyInitialView();
-    const ro = new ResizeObserver(() => {
-      applyInitialView();
-    });
+    const ro = new ResizeObserver(() => applyInitialView());
     ro.observe(svg);
     return () => ro.disconnect();
-  }, [bounds, svgRef, deferLayoutOriginInitialPan]);
+  }, [bounds, svgRef, deferLayoutOriginInitialPan, viewKey, fitView, setPan, setScale]);
 
-  const zoomIn = useCallback(
-    () => setScale((s) => Math.min(ZOOM_MAX, s * ZOOM_STEP)),
-    []
-  );
-  const zoomOut = useCallback(
-    () => setScale((s) => Math.max(ZOOM_MIN, s / ZOOM_STEP)),
-    []
-  );
+  const zoomIn = useCallback(() => setScale((s) => Math.min(ZOOM_MAX, s * ZOOM_STEP)), [setScale]);
+  const zoomOut = useCallback(() => setScale((s) => Math.max(ZOOM_MIN, s / ZOOM_STEP)), [setScale]);
 
   /** Same view as initial load: root centered, near top, initial scale. */
   const goToInitialView = useCallback(() => {
@@ -134,11 +168,9 @@ export function usePanZoom({
     if (!svg || !bounds) return;
     const rect = svg.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;
-    const px = rect.width / 2 - baseX;
-    const py = INITIAL_TOP_PADDING - baseY;
-    setPan({ x: px, y: py });
+    setPan({ x: rect.width / 2 - baseX, y: INITIAL_TOP_PADDING - baseY });
     setScale(INITIAL_SCALE);
-  }, [svgRef, bounds, baseX, baseY]);
+  }, [svgRef, bounds, baseX, baseY, setPan, setScale]);
 
   /** Pan and zoom so that the given layout position (e.g. a person's center) is centered in the viewport at initial scale. */
   const centerOnPosition = useCallback(
@@ -148,12 +180,10 @@ export function usePanZoom({
       const rect = svg.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return;
       const s = INITIAL_SCALE;
-      const px = rect.width / 2 - baseX - layoutX * s;
-      const py = INITIAL_TOP_PADDING - baseY - layoutY * s;
-      setPan({ x: px, y: py });
+      setPan({ x: rect.width / 2 - baseX - layoutX * s, y: INITIAL_TOP_PADDING - baseY - layoutY * s });
       setScale(s);
     },
-    [svgRef, baseX, baseY]
+    [svgRef, baseX, baseY, setPan, setScale]
   );
 
   /** Embed pedigree: root person's left edge at 10px from container left, vertically centered. */
@@ -164,31 +194,24 @@ export function usePanZoom({
       const rect = svg.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return;
       const s = INITIAL_SCALE;
-      const px = 10 + (PERSON_WIDTH / 2) * s - baseX - layoutX * s;
-      const py = rect.height / 2 - baseY - layoutY * s;
-      setPan({ x: px, y: py });
+      setPan({
+        x: 10 + (PERSON_WIDTH / 2) * s - baseX - layoutX * s,
+        y: rect.height / 2 - baseY - layoutY * s,
+      });
       setScale(s);
     },
-    [svgRef, baseX, baseY]
+    [svgRef, baseX, baseY, setPan, setScale]
   );
 
+  /** Fit the whole chart width (and height) in the viewport, centred horizontally. */
   const fitToScreen = useCallback(() => {
     const svg = svgRef.current;
     if (!svg || !bounds) return;
     const rect = svg.getBoundingClientRect();
-    const tw = bounds.maxX - bounds.minX;
-    const th = bounds.maxY + 100;
-    const fitScale = Math.min(
-      1,
-      Math.min((rect.width - 160) / tw, (rect.height - 80) / th)
-    );
-    const s = Math.max(0.25, Math.min(1.2, fitScale));
-    // Root person (layout 0,0): centered horizontally, near top of viewport
-    const px = rect.width / 2 - baseX;
-    const py = INITIAL_TOP_PADDING - baseY;
-    setScale(s);
-    setPan({ x: px, y: py });
-  }, [svgRef, bounds, baseX, baseY]);
+    const view = fitView(rect, bounds, rect.height);
+    setScale(view.scale);
+    setPan(view.pan);
+  }, [svgRef, bounds, fitView, setPan, setScale]);
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -209,12 +232,9 @@ export function usePanZoom({
     (e: React.PointerEvent) => {
       if (isPinchingRef.current || !dragging) return;
       e.preventDefault();
-      setPan({
-        x: panAtDrag.x + (e.clientX - dragStart.x),
-        y: panAtDrag.y + (e.clientY - dragStart.y),
-      });
+      setPan({ x: panAtDrag.x + (e.clientX - dragStart.x), y: panAtDrag.y + (e.clientY - dragStart.y) });
     },
-    [dragging, panAtDrag, dragStart]
+    [dragging, panAtDrag, dragStart, setPan]
   );
 
   const onPointerUp = useCallback((e: React.PointerEvent) => {
@@ -228,105 +248,72 @@ export function usePanZoom({
     setDragging(false);
   }, []);
 
-  const onWheel = useCallback(
-    (e: React.WheelEvent) => {
-      e.preventDefault();
-      const rect = svgRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const ns = Math.min(
-        3,
-        Math.max(0.2, scale * (1 - e.deltaY * 0.001))
-      );
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-      const r = ns / scale;
-      setPan((prev) => ({
-        x: mx - r * (mx - prev.x),
-        y: my - r * (my - prev.y),
-      }));
-      setScale(ns);
-    },
-    [svgRef, scale]
-  );
-
-  // Pinch-to-zoom: attach with { passive: false } so preventDefault() works and browser doesn't double-zoom
+  // Wheel and pinch zoom, attached with { passive: false } so preventDefault() stops the page
+  // from scrolling or zooming too (B02; React's onWheel is passive).
   useEffect(() => {
     const el = svgRef.current;
     if (!el) return;
 
-    const getDist = (t1: Touch, t2: Touch) =>
-      Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const s = scaleRef.current;
+      const ns = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, s * (1 - e.deltaY * 0.001)));
+      zoomAround(e.clientX - rect.left, e.clientY - rect.top, s, ns, panRef.current);
+    };
+
+    const getDist = (t1: Touch, t2: Touch) => Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
     const getCenter = (t1: Touch, t2: Touch) => {
       const rect = el.getBoundingClientRect();
-      return {
-        x: (t1.clientX + t2.clientX) / 2 - rect.left,
-        y: (t1.clientY + t2.clientY) / 2 - rect.top,
-      };
+      return { x: (t1.clientX + t2.clientX) / 2 - rect.left, y: (t1.clientY + t2.clientY) / 2 - rect.top };
     };
 
     const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 2) {
-        // Prevent the browser (iOS Safari in particular) from claiming the
-        // pinch-zoom gesture at the OS level. Must be called before the browser
-        // commits to its own gesture, so touchstart must be non-passive.
-        e.preventDefault();
-        isPinchingRef.current = true;
-        // Abort any active single-finger drag so pointer-move doesn't interfere.
-        setDragging(false);
-        // Release any captured pointer so it doesn't receive spurious pointermove events.
-        if (capturedPointerRef.current) {
-          const { el, id } = capturedPointerRef.current;
-          if ((el as HTMLElement).hasPointerCapture?.(id)) {
-            (el as HTMLElement).releasePointerCapture(id);
-          }
-          capturedPointerRef.current = null;
-        }
-        pinchStartDistRef.current = getDist(e.touches[0], e.touches[1]);
-        pinchStartCenterRef.current = getCenter(e.touches[0], e.touches[1]);
-        pinchStartScaleRef.current = scaleRef.current;
-        pinchStartPanRef.current = { ...panRef.current };
+      if (e.touches.length !== 2) return;
+      // Non-passive, so iOS Safari doesn't claim the pinch for its own page zoom.
+      e.preventDefault();
+      isPinchingRef.current = true;
+      setDragging(false);
+      if (capturedPointerRef.current) {
+        const { el: captured, id } = capturedPointerRef.current;
+        if ((captured as HTMLElement).hasPointerCapture?.(id)) (captured as HTMLElement).releasePointerCapture(id);
+        capturedPointerRef.current = null;
       }
+      pinchStartDistRef.current = getDist(e.touches[0], e.touches[1]);
+      pinchStartScaleRef.current = scaleRef.current;
+      pinchStartPanRef.current = { ...panRef.current };
     };
 
     const onTouchMove = (e: TouchEvent) => {
       if (e.touches.length !== 2 || pinchStartDistRef.current === null) return;
       e.preventDefault();
-      const dist = getDist(e.touches[0], e.touches[1]);
       const center = getCenter(e.touches[0], e.touches[1]);
       const startScale = pinchStartScaleRef.current;
-      const startPan = pinchStartPanRef.current;
-      const scaleFactor = dist / pinchStartDistRef.current;
-      const ns = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, startScale * scaleFactor));
-      const r = ns / startScale;
-      const mx = center.x;
-      const my = center.y;
-      setPan({
-        x: mx - r * (mx - startPan.x),
-        y: my - r * (my - startPan.y),
-      });
-      setScale(ns);
+      const factor = getDist(e.touches[0], e.touches[1]) / pinchStartDistRef.current;
+      const ns = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, startScale * factor));
+      zoomAround(center.x, center.y, startScale, ns, pinchStartPanRef.current);
     };
 
     const onTouchEnd = (e: TouchEvent) => {
       if (e.touches.length < 2) {
         isPinchingRef.current = false;
         pinchStartDistRef.current = null;
-        pinchStartCenterRef.current = null;
       }
     };
 
-    // Non-passive so e.preventDefault() can suppress iOS Safari's native pinch-zoom gesture.
+    el.addEventListener("wheel", onWheel, { passive: false });
     el.addEventListener("touchstart", onTouchStart, { passive: false });
     el.addEventListener("touchmove", onTouchMove, { passive: false });
     el.addEventListener("touchend", onTouchEnd, { passive: true });
     el.addEventListener("touchcancel", onTouchEnd, { passive: true });
     return () => {
+      el.removeEventListener("wheel", onWheel);
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("touchend", onTouchEnd);
       el.removeEventListener("touchcancel", onTouchEnd);
     };
-  }, [svgRef]);
+  }, [svgRef, zoomAround]);
 
   return {
     pan,
@@ -343,6 +330,5 @@ export function usePanZoom({
     onPointerDown,
     onPointerMove,
     onPointerUp,
-    onWheel,
   };
 }

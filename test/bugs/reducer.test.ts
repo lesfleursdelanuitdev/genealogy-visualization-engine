@@ -2,7 +2,6 @@
  * Audit bugs in the tree reducer. IDs follow docs/v0.1.0-progress.md ("Bug list").
  */
 import { describe, it, expect } from "vitest";
-import { knownBug } from "../helpers/bugs";
 import { graphOf, reduce, emptyState, person, union } from "../helpers/graph";
 import { DEFAULT_MAX_DEPTH, type ViewState } from "../../src";
 

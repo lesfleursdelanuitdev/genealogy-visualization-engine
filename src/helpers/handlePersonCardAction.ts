@@ -80,18 +80,7 @@ export function handlePersonCardAction(
   }
 
   if (action === "expandDown") {
-    const currentDepth = ctx.currentDepth ?? 0;
-    const maxDepth = ctx.maxDepth ?? 0;
     const atMaxDepth = ctx.atMaxDepth ?? false;
-    const currentLessThanMax = currentDepth < maxDepth;
-    console.log("[Show children] action triggered", {
-      "1. currentDepth": currentDepth,
-      "2. maxDepth": maxDepth,
-      "3. current depth < max depth?": currentLessThanMax,
-      "4. atMaxDepth (will re-root if true)": atMaxDepth,
-      "5. current root": ctx.rootId ?? "(none)",
-      personId,
-    });
     dispatch({
       type: "SHOW_CHILDREN",
       personId,

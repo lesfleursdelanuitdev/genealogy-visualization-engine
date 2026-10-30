@@ -61,11 +61,6 @@ export function useDepth({
 
   const handleMaxDepthChange = useCallback(
     (newDepth: number) => {
-      console.log("[Depth dropdown] current depth changed", {
-        "old current depth": maxDepth,
-        "new current depth": newDepth,
-        "max depth": DEFAULT_MAX_DEPTH,
-      });
       dispatch({ type: "SET_CURRENT_DEPTH", depth: newDepth });
       setMaxDepth(newDepth);
     },
@@ -81,11 +76,6 @@ export function useDepth({
     if (viewState.displayDepth != null) return; // let Show children / displayDepth drive depth for this build
     const current = effectiveCurrentDepth;
     if (maxDepthRendered !== current) {
-      console.log(
-        "[Depth] Syncing current depth to rendered depth: %d → %d",
-        current,
-        maxDepthRendered
-      );
       dispatch({ type: "SET_CURRENT_DEPTH", depth: maxDepthRendered });
       setMaxDepth(maxDepthRendered);
     }
