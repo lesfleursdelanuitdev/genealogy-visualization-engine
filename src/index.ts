@@ -124,7 +124,7 @@ export {
 } from "./helpers";
 
 export type { ChartViewStrategyName, ChartViewBuildAdapter } from "./chartView";
-export { CHART_VIEW_STRATEGIES, isChartViewStrategyName } from "./chartView";
+export { CHART_VIEW_STRATEGIES, isChartViewStrategyName, createChartAdapter } from "./chartView";
 
 export {
   bandThicknessForGeneration,

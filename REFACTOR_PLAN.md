@@ -2,6 +2,8 @@
 
 This document turns the architectural goals into a concrete, phased plan. It targets **`@ligneous/visualization-engine`** (`packages/genealogy-visualization-engine`).
 
+> **Status (v0.1.0, 2026-10-30):** phases 0–5 and 7 are done on branch `engine-v0.1.0` (`GraphSnapshot`, test data only in tests, `createChartSession` with no global builder, injected `fetchGraph` + `parseChartApiResponse`, builder vs `buildTree` settled: the snapshot is the builder). Phase 6, moving `the-gonsalves-family` over, is its own later step. See `CHANGELOG.md` and `docs/v0.1.0-progress.md`.
+
 ## Current weaknesses (why refactor)
 
 The package has a clear **boundary** (exports, folder layout) but **behavioral coupling** remains:

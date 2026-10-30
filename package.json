@@ -1,6 +1,6 @@
 {
   "name": "@ligneous/visualization-engine",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "Headless layout engine for family-tree charts: descendancy, pedigree, vertical pedigree and fan.",

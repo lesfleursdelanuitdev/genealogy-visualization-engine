@@ -75,7 +75,7 @@ interface UnionRecord {
 }
 ```
 
-These are GEDCOM concepts (xrefs, `HUSB`/`WIFE`/`CHIL`, `PEDI`), but the engine does not read the Go parser's intermediate representation directly. In the app, the `/api/tree/descendancy`, `/api/tree/pedigree` and `/api/tree/sibling-view` routes query Postgres through Prisma and return `{ rootId, people, unions }` JSON. `useChartViewFetch` maps that JSON into `DescendancyPerson[]` and `UnionRecord[]` (`src/hooks/useChartViewFetch.ts`).
+These are GEDCOM concepts (xrefs, `HUSB`/`WIFE`/`CHIL`, `PEDI`), but the engine does not read the Go parser's intermediate representation directly. In the Gonsalves app, the `/api/tree/descendancy`, `/api/tree/pedigree` and `/api/tree/sibling-view` routes query Postgres through Prisma and return `{ rootId, people, unions }` JSON, which `parseChartApiResponse` turns into engine input. The standalone viewer (tree-viewer.ligneous.org) builds the same input from a whole GEDCOM file in the browser.
 
 ## Install
 
@@ -134,20 +134,44 @@ const next = reduce(createInitialState("descendancy", "@I2@"), { type: "REVEAL_A
 
 `strategy` can also be `"pedigree"`, `"vertical_pedigree"` or `"fan_chart"`. Sessions hold no shared state, so a page chart and a modal chart can build side by side. They are cheap; make a new one when the view state changes and keep reusing the snapshot.
 
-In a React app, `useChartViewFetch(strategyName, rootId, depth)` still fetches the Gonsalves `/api/tree/*` routes and returns `{ chartAdapter, graph, … }`; making fetching pluggable is the next step of the refactor plan (phase 4).
+A viewer with the whole file in memory needs nothing else: build one snapshot, then a session per view. The pure functions in `src/graph/queries.ts` answer what a server used to (parent families, sibling view, ancestor and descendant counts), and `searchPeople(graph, query)` searches names and years, 10 at a time.
+
+An app that loads a chart's graph from a server uses `useChartViewFetch` with its own fetch function; the engine builds no URLs:
+
+```ts
+const { chartAdapter, graph, isChartLoading, error } = useChartViewFetch({
+  fetchGraph: async (request) => {
+    const res = await fetch(urlFor(request), { signal: request.signal }); // the app's own route
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    return parseChartApiResponse(await res.json()); // Gonsalves wire format
+  },
+  strategyName: "descendancy",
+  rootId,
+  maxDepth: 4,
+});
+```
+
+Only the newest request counts: a new root aborts the old request and late answers are ignored.
+
+**"+N" chips.** On all four charts, a card at the depth limit or on a collapsed branch has `_hiddenCount`: how many different people are hidden beyond it (descendants, or ancestors on the ancestor charts). Dispatch `{ type: "SHOW_HIDDEN", personId }` when the chip is tapped: that branch gets one more generation, and a history entry is pushed.
+
+**Pan and zoom** (`usePanZoom`): draw at `translate(baseX + pan.x, baseY + pan.y) scale(scale)`. The hook adds its own non-passive wheel and touch listeners and sets `touch-action: none` on the `<svg>`; wire only `onPointerDown/Move/Up`. Pass `viewKey` (e.g. `${chart}:${root}`) so the initial view applies once per chart. A press on a `button`, link or `[data-chart-interactive]` stays a tap unless it moves 4 px.
+
+See `CHANGELOG.md` for what changed in 0.1.0.
 
 ## API summary
 
 | Area | Main exports |
 | --- | --- |
-| Data in | `createGraphSnapshot`, `GraphSnapshot`, `GraphInput`, `DescendancyPerson`, `UnionRecord`, `ViewState` |
+| Data in | `createGraphSnapshot`, `GraphSnapshot`, `GraphInput`, `DescendancyPerson`, `UnionRecord`, `ViewState`, `parseChartApiResponse` |
+| Graph queries | `parentFamiliesOf`, `birthFamilyOf`, `defaultFamc`, `computeSiblingView`, `siblingsOf`, `familiesAsPartnerOf`, `countAncestors`, `countDescendants`, `countDescendantsWithin`, `searchPeople` |
 | Charts | `createChartSession`, `ChartSession`, `ChartLayout`, `layoutChart`, `buildTree`, `CHART_VIEW_STRATEGIES` |
 | Layout | `layout`, `getBounds`, `computeFitToViewport`, `defaultConnectors`, size constants (`PERSON_WIDTH`, `PERSON_HEIGHT`, `GAP`, ...) |
 | Fan chart geometry | `buildFanGeometry`, `buildAnnularSectorPath`, `buildTextArcPath`, `polarToCartesian`, `computeAvatarPlacement`, `FAN_CHART_DEFAULTS` |
 | Node model | `PersonNode`, `UnionNode`, `NormalUnionNode`, `CatchAllNode`, `LinkedParentNode`, `SiblingAdoptiveUnionNode` |
 | State | `treeReducer(state, action, graph)`, `createTreeReducer(graph)`, `createInitialState`, `TreeState`, `TreeAction`, `HistoryEntry` |
 | React hooks | `useChartViewFetch`, `useTreeBuild`, `usePanZoom`, `usePanToPerson`, `useChartSearch`, `useDepth`, `useSpouseDrawer`, `usePanelVisibility` |
-| Helpers | `handlePersonCardAction`, `buildLegendItems`, `countVisibleNodes`, `countDescendants` |
+| Helpers | `handlePersonCardAction`, `buildLegendItems`, `countVisibleNodes`, `createGraphIndividualsSearch` |
 
 Everything is exported from the package root.
 
@@ -161,11 +185,15 @@ npm run build       # dist/: ESM + .d.ts
 npm run check       # all three
 ```
 
-`test/app/` holds the 74 engine tests copied from the Gonsalves app. `test/bugs/` holds repros for the 2026-10-17 audit's bugs: each is an `it.fails` (through `knownBug()`) until its fix lands. `BUGS_STRICT=1 npx vitest run test/bugs` shows their real failures. `test/fixtures/smith` is a small fictional family for tests and demos.
+`test/app/` holds the 74 engine tests copied from the Gonsalves app (two adapted to 0.1.0, marked in place). `test/bugs/` holds the repros for the 2026-10-17 audit's bugs, all fixed in 0.1.0. A new known bug can be added with `knownBug()` (`test/helpers/bugs.ts`): an `it.fails` until its fix lands; `BUGS_STRICT=1 npx vitest run test/bugs` shows the real failures. `test/fixtures/smith` is a small fictional family for tests and demos.
 
 ## Known limits
 
-`REFACTOR_PLAN.md` describes the work in progress. Phases 1–3 are done: the engine reads only the `GraphSnapshot` it is given, and there is no global builder. Still to do: `useChartViewFetch` hard-codes the Gonsalves `/api/tree/*` routes (phase 4), the default root is a Gonsalves person, and the bugs in `test/bugs/` are open. Progress: `docs/v0.1.0-progress.md`.
+- `dist/` is for bundlers only in v0.1.0 (T22): its imports have no file extensions, so bare Node ESM can't load it.
+- Redaction of living people is the renderer's job (spec Part 3, `privacy: "hide-living"`); the engine only treats a missing `isLiving` as living.
+- The 8 "TBD" card actions are decided with the renderer (step 3, T23).
+
+Progress and decisions: `docs/v0.1.0-progress.md`. Server logic ported from Gonsalves: `docs/server-logic-for-standalone.md`.
 
 ## Stack
 

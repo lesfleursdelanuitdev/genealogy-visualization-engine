@@ -90,7 +90,9 @@ The build that feeds this layout is `buildTree` with `DescendancyViewStrategy`. 
 
 ## Known limitations
 
-- **Fixed API routes.** `useChartViewFetch` hard-codes `/api/tree/descendancy`, `/api/tree/pedigree` and `/api/tree/sibling-view` (refactor phase 4).
-- **Open audit bugs**, listed in `docs/v0.1.0-progress.md` and reproduced in `test/bugs/`, among them the fan-chart bounds (computed from the radius alone) and the stale-fetch race.
-- **Server logic.** The Gonsalves routes compute the sibling view, parent-family choice and redaction; a standalone viewer must do this in JavaScript (`docs/server-logic-for-standalone.md`).
+- `dist/` is bundler-only ESM (no file extensions in imports), by decision for v0.1.0 (T22).
+- Redaction of living people is left to the renderer; the engine treats a missing `isLiving` as living.
+- The 8 "TBD" card actions are decided with the renderer (T23).
 - **Peer dependency** on `@tanstack/react-query` is declared but the source does not import it.
+
+Fetching is injected (`useChartViewFetch({ fetchGraph })`), the Gonsalves server's chart logic is ported to `src/graph/queries.ts`, and the 2026-10-17 audit's bugs are fixed with repros in `test/bugs/` (see `CHANGELOG.md`).
