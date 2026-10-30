@@ -169,8 +169,11 @@ export {
   type ApiChartResponse,
 } from "./fetch";
 
+export { searchPeople, type SearchPeopleOptions, type SearchPeopleResult } from "./search";
+
 export {
   useChartSearch,
+  createGraphIndividualsSearch,
   useChartViewFetch,
   type UseChartViewFetchResult,
   type UseChartViewFetchOptions,

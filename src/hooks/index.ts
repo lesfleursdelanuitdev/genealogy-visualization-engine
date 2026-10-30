@@ -1,5 +1,6 @@
 export {
   useChartSearch,
+  createGraphIndividualsSearch,
   type UseChartSearchOptions,
   type UseTreeIndividualsFn,
   type UseTreeIndividualsOptions,
