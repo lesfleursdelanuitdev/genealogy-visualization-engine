@@ -3,11 +3,11 @@
 import { useState, useEffect, useRef } from "react";
 import { createGraphSnapshot, type GraphSnapshot } from "../graph";
 import { DEFAULT_MAX_DEPTH } from "../constants";
-import type { DescendancyPerson } from "../types";
 import type { SiblingView } from "../types";
 import type { ChartViewStrategyName } from "../chartView/chartViewStrategyName";
-import { createChartAdapter } from "../chartView/createChartAdapter";
 import type { ChartViewBuildAdapter } from "../chartView/ChartViewBuildAdapter";
+import { createChartAdapter } from "../chartView/createChartAdapter";
+import type { FetchChartGraph } from "../fetch/types";
 import {
   chartSwitchAdapterFromPayloadBegin,
   chartSwitchAdapterFromPayloadEnd,
@@ -15,201 +15,143 @@ import {
   chartSwitchChartFetchEnd,
 } from "../debug/chartSwitchTiming";
 
-interface ApiPerson {
-  id: string;
-  uuid?: string | null;
-  firstName?: string;
-  lastName?: string;
-  birthYear?: number | null;
-  deathYear?: number | null;
-  /** Full display strings from API (`mapIndividualRow`); do not truncate. */
-  birthPlace?: string | null;
-  deathPlace?: string | null;
-  gender?: string | null;
-  photoUrl?: string | null;
-  isLiving?: boolean;
-  [k: string]: unknown;
-}
-
-interface ApiUnion {
-  id?: string;
-  husb: string;
-  wife: string;
-  children: Array<{ id: string; pedi: string }>;
-}
-
-interface ApiResponse {
+export interface UseChartViewFetchOptions {
+  /** Loads the graph for a request. The engine builds no URLs; see parseChartApiResponse for Gonsalves. */
+  fetchGraph: FetchChartGraph;
+  strategyName: ChartViewStrategyName;
   rootId: string;
-  people: ApiPerson[];
-  unions: ApiUnion[];
-  siblingView?: SiblingView;
-  /** Pedigree API: individuals in this payload who appear as a child in more than one family. */
-  multiFamilyChildXrefs?: string[];
-}
-
-const DEBUG_BUILDER = process.env.NEXT_PUBLIC_DEBUG_DESCENDANCY === "true";
-
-function normalizeRootXref(xref: string): string {
-  const s = xref.trim();
-  return s.startsWith("@") ? s : `@${s}@`;
-}
-
-function stablePedigreeOverridesKey(overrides: Record<string, string> | null | undefined): string {
-  if (overrides == null || Object.keys(overrides).length === 0) return "";
-  const keys = Object.keys(overrides).sort();
-  return keys.map((k) => `${k}\t${overrides[k]}`).join("\n");
-}
-
-function mapPeopleAndUnions(data: ApiResponse): {
-  peopleList: DescendancyPerson[];
-  unions: Array<{ id?: string; husb: string; wife: string; children: Array<{ id: string; pedi: string }> }>;
-} {
-  const people = new Map<string, DescendancyPerson>();
-  for (const p of data.people) {
-    const photo =
-      typeof p.photoUrl === "string" ? (p.photoUrl.trim() || null) : null;
-    const birthPlace =
-      typeof p.birthPlace === "string" ? (p.birthPlace.trim() || null) : (p.birthPlace ?? null);
-    const deathPlace =
-      typeof p.deathPlace === "string" ? (p.deathPlace.trim() || null) : (p.deathPlace ?? null);
-    people.set(p.id, {
-      id: p.id,
-      xref: p.id,
-      uuid: p.uuid ?? null,
-      firstName: p.firstName ?? "",
-      lastName: p.lastName ?? "",
-      birthYear: p.birthYear ?? null,
-      deathYear: p.deathYear ?? null,
-      birthPlace,
-      deathPlace,
-      photoUrl: photo,
-      gender: p.gender ?? null,
-      isLiving: p.isLiving === true,
-    });
-  }
-  const unions = data.unions.map((u) => ({
-    id: u.id,
-    husb: u.husb,
-    wife: u.wife,
-    children: u.children.map((c) => ({ id: c.id, pedi: c.pedi || "birth" })),
-  }));
-  return { peopleList: Array.from(people.values()), unions };
+  /** Generations to request. Default DEFAULT_MAX_DEPTH. */
+  maxDepth?: number;
+  /** Descendancy only: request the sibling view of this person. */
+  siblingViewPersonId?: string | null;
+  /** Called with the sibling-view meta when an answer carries it. */
+  onSiblingViewMeta?: ((siblingView: SiblingView) => void) | null;
+  /** Ancestor charts: the root's chosen parent family (`@F…@`). */
+  pedigreeFamcFamilyXref?: string | null;
+  /** Ancestor charts: chosen parent family per ancestor (person id → family id). */
+  pedigreeFamcOverrides?: Readonly<Record<string, string>> | null;
 }
 
 export interface UseChartViewFetchResult {
   lastApiRootId: string | null;
   isChartLoading: boolean;
+  /** Bumps on every finished request (data or error). */
   chartDataKey: number;
   chartAdapter: ChartViewBuildAdapter | null;
   /** The loaded people and unions (same object as `chartAdapter.graph`); bind the reducer to it. */
   graph: GraphSnapshot | null;
-  /** Pedigree API: xrefs of people in the chart who are a child in more than one family (for card actions). */
+  /** The last request's failure, or null. */
+  error: Error | null;
+  /** People in the answer who are a child in more than one family (for card actions). */
   pedigreeMultiFamilyChildXrefs: string[];
 }
 
+function stablePedigreeOverridesKey(overrides: Readonly<Record<string, string>> | null | undefined): string {
+  if (overrides == null) return "";
+  const keys = Object.keys(overrides).sort();
+  return keys.map((k) => `${k}\t${overrides[k]}`).join("\n");
+}
+
+const NO_XREFS: string[] = [];
+
 /**
- * Fetches tree snapshot for the active view strategy and exposes a {@link ChartViewBuildAdapter}.
+ * Loads the chart's graph through `fetchGraph` and exposes a {@link ChartViewBuildAdapter}.
+ * Only the newest request counts: a request is aborted when the root, chart type, depth or
+ * family choice changes, and an answer that arrives after that is ignored.
  */
-export function useChartViewFetch(
-  strategyName: ChartViewStrategyName,
-  rootId: string,
-  maxDepth: number = DEFAULT_MAX_DEPTH,
-  /** Descendancy only: sibling-view API when set. */
-  siblingViewPersonId?: string | null,
-  onSiblingViewMeta?: ((siblingView: SiblingView) => void) | null,
-  /** Pedigree / vertical pedigree / fan: optional `@F…@` to anchor the root to one FAMC when they have multiple families as child. */
-  pedigreeFamcFamilyXref?: string | null,
-  /** Pedigree / vertical pedigree / fan: per-person FAMC choices for non-root ancestors (xref → family xref). */
-  pedigreeFamcOverrides?: Record<string, string> | null
-): UseChartViewFetchResult {
+export function useChartViewFetch({
+  fetchGraph,
+  strategyName,
+  rootId,
+  maxDepth = DEFAULT_MAX_DEPTH,
+  siblingViewPersonId,
+  onSiblingViewMeta,
+  pedigreeFamcFamilyXref,
+  pedigreeFamcOverrides,
+}: UseChartViewFetchOptions): UseChartViewFetchResult {
   const [lastApiRootId, setLastApiRootId] = useState<string | null>(null);
   const [isChartLoading, setIsChartLoading] = useState(true);
   const [chartDataKey, setChartDataKey] = useState(0);
   const [chartAdapter, setChartAdapter] = useState<ChartViewBuildAdapter | null>(null);
-  const [pedigreeMultiFamilyChildXrefs, setPedigreeMultiFamilyChildXrefs] = useState<string[]>([]);
+  const [error, setError] = useState<Error | null>(null);
+  const [pedigreeMultiFamilyChildXrefs, setPedigreeMultiFamilyChildXrefs] = useState<string[]>(NO_XREFS);
+
+  // Latest callbacks without refetching when only their identity changes.
+  const fetchGraphRef = useRef(fetchGraph);
+  fetchGraphRef.current = fetchGraph;
   const onSiblingViewMetaRef = useRef(onSiblingViewMeta);
   onSiblingViewMetaRef.current = onSiblingViewMeta;
+  const overridesRef = useRef(pedigreeFamcOverrides);
+  overridesRef.current = pedigreeFamcOverrides;
 
-  const overridesKey = stablePedigreeOverridesKey(pedigreeFamcOverrides ?? undefined);
-  const fetchKey = `${strategyName}\n${rootId}\n${maxDepth}\n${siblingViewPersonId ?? ""}\n${pedigreeFamcFamilyXref ?? ""}\n${overridesKey}`;
+  const overridesKey = stablePedigreeOverridesKey(pedigreeFamcOverrides);
+  const siblingPerson = strategyName === "descendancy" ? siblingViewPersonId?.trim() || null : null;
 
   useEffect(() => {
-    const useSiblingView =
-      strategyName === "descendancy" && Boolean(siblingViewPersonId?.trim());
-    if (DEBUG_BUILDER) console.log("[useChartViewFetch] Fetch started");
+    const controller = new AbortController();
+    let current = true;
     setChartAdapter(null);
-    setPedigreeMultiFamilyChildXrefs([]);
-    const tid = setTimeout(() => {
-      setLastApiRootId(null);
-      setIsChartLoading(true);
-    }, 0);
+    setError(null);
+    setLastApiRootId(null);
+    setPedigreeMultiFamilyChildXrefs(NO_XREFS);
+    setIsChartLoading(true);
 
-    const usesPedigreeApi =
-      strategyName === "pedigree" ||
-      strategyName === "vertical_pedigree" ||
-      strategyName === "fan_chart";
-    const famc =
-      usesPedigreeApi && pedigreeFamcFamilyXref != null && pedigreeFamcFamilyXref.trim() !== ""
-        ? `&famc=${encodeURIComponent(normalizeRootXref(pedigreeFamcFamilyXref.trim()))}`
-        : "";
-    const ov = pedigreeFamcOverrides ?? {};
-    const famcOverrides =
-      usesPedigreeApi && Object.keys(ov).length > 0
-        ? `&famcOverrides=${encodeURIComponent(JSON.stringify(ov))}`
-        : "";
-    const url =
-      usesPedigreeApi
-        ? `/api/tree/pedigree?root=${encodeURIComponent(normalizeRootXref(rootId))}&depth=${maxDepth}${famc}${famcOverrides}`
-        : useSiblingView
-          ? `/api/tree/sibling-view?person=${encodeURIComponent(normalizeRootXref(siblingViewPersonId!))}&depth=${maxDepth}`
-          : `/api/tree/descendancy?root=${encodeURIComponent(normalizeRootXref(rootId))}&depth=${maxDepth}`;
-
-    let chartFetchResponseHandled = false;
-    const endChartFetchTimerOnce = () => {
-      if (chartFetchResponseHandled) return;
-      chartFetchResponseHandled = true;
+    let fetchTimerOpen = true;
+    const endFetchTimer = () => {
+      if (!fetchTimerOpen) return;
+      fetchTimerOpen = false;
       chartSwitchChartFetchEnd();
     };
-
     chartSwitchChartFetchBegin();
-    fetch(url)
-      .then((res) => {
-        endChartFetchTimerOnce();
-        return res.ok ? res.json() : Promise.reject(new Error(`${res.status} ${res.statusText}`));
-      })
-      .then((data: ApiResponse) => {
-        if (useSiblingView && data.siblingView) {
-          onSiblingViewMetaRef.current?.(data.siblingView);
-        }
+
+    const overrides = overridesRef.current;
+    let request: Promise<Awaited<ReturnType<FetchChartGraph>>>;
+    try {
+      request = fetchGraphRef.current({
+        strategy: strategyName,
+        rootId,
+        depth: maxDepth,
+        siblingViewPersonId: siblingPerson,
+        pedigreeFamcFamilyXref: pedigreeFamcFamilyXref ?? null,
+        pedigreeFamcOverrides: overrides && Object.keys(overrides).length > 0 ? overrides : null,
+        signal: controller.signal,
+      });
+    } catch (e) {
+      request = Promise.reject(e);
+    }
+
+    request.then(
+      (answer) => {
+        endFetchTimer();
+        if (!current) return;
+        if (siblingPerson && answer.siblingView) onSiblingViewMetaRef.current?.(answer.siblingView);
         chartSwitchAdapterFromPayloadBegin();
         try {
-          const { peopleList, unions } = mapPeopleAndUnions(data);
-          if (usesPedigreeApi) {
-            setPedigreeMultiFamilyChildXrefs(data.multiFamilyChildXrefs ?? []);
-          }
-          const graph = createGraphSnapshot({ people: peopleList, unions });
+          const graph = createGraphSnapshot(answer);
           setChartAdapter(createChartAdapter(strategyName, graph));
-          setLastApiRootId(data.rootId);
-          setChartDataKey((k) => k + 1);
-          setIsChartLoading(false);
+          setPedigreeMultiFamilyChildXrefs(answer.multiFamilyChildXrefs ?? NO_XREFS);
+          setLastApiRootId(answer.rootId ?? rootId);
         } finally {
           chartSwitchAdapterFromPayloadEnd();
         }
-      })
-      .catch((err) => {
-        endChartFetchTimerOnce();
-        console.warn(
-          `[Tree ${strategyName}] API request failed:`,
-          err instanceof Error ? err.message : err
-        );
-        setChartAdapter(null);
-        setLastApiRootId(null);
-        setPedigreeMultiFamilyChildXrefs([]);
         setChartDataKey((k) => k + 1);
         setIsChartLoading(false);
-      });
-    return () => clearTimeout(tid);
-  }, [fetchKey, strategyName]);
+      },
+      (e: unknown) => {
+        endFetchTimer();
+        if (!current) return;
+        setError(e instanceof Error ? e : new Error(String(e)));
+        setChartDataKey((k) => k + 1);
+        setIsChartLoading(false);
+      }
+    );
+
+    return () => {
+      current = false;
+      controller.abort();
+    };
+    // overridesKey stands for pedigreeFamcOverrides (read through overridesRef).
+  }, [strategyName, rootId, maxDepth, siblingPerson, pedigreeFamcFamilyXref, overridesKey]);
 
   return {
     lastApiRootId,
@@ -217,6 +159,7 @@ export function useChartViewFetch(
     chartDataKey,
     chartAdapter,
     graph: chartAdapter?.graph ?? null,
+    error,
     pedigreeMultiFamilyChildXrefs,
   };
 }

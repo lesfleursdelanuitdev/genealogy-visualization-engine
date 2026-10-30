@@ -11,7 +11,7 @@ import type { ChartViewBuildAdapter } from "../chartView/ChartViewBuildAdapter";
 import { layoutChart } from "../session/createChartSession";
 import { chartSwitchLayoutBegin, chartSwitchLayoutEnd } from "../debug/chartSwitchTiming";
 
-const DEBUG_BUILDER = process.env.NEXT_PUBLIC_DEBUG_DESCENDANCY === "true";
+import { DEBUG_DESCENDANCY as DEBUG_BUILDER } from "../env";
 
 export interface UseTreeBuildOptions {
   effectiveRootId: string;

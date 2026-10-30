@@ -7,7 +7,7 @@
  * Rendering lives in the app (or @ligneous/visualization-react).
  */
 
-export { MAX_HISTORY, DEFAULT_MAX_DEPTH, DEFAULT_PEDIGREE_DEPTH, DEFAULT_ROOT_XREF } from "./constants";
+export { MAX_HISTORY, DEFAULT_MAX_DEPTH, DEFAULT_PEDIGREE_DEPTH } from "./constants";
 export {
   PERSON_WIDTH,
   PERSON_HEIGHT,
@@ -142,9 +142,21 @@ export {
 } from "./strategies/fanChart";
 
 export {
+  parseChartApiResponse,
+  ChartApiFormatError,
+  type ChartGraphRequest,
+  type ChartGraphResponse,
+  type FetchChartGraph,
+  type ApiPerson,
+  type ApiUnion,
+  type ApiChartResponse,
+} from "./fetch";
+
+export {
   useChartSearch,
   useChartViewFetch,
   type UseChartViewFetchResult,
+  type UseChartViewFetchOptions,
   useDepth,
   usePanelVisibility,
   usePanToPerson,

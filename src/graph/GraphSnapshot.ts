@@ -65,7 +65,8 @@ function pushTo<K, V>(map: Map<K, V[]>, key: K, value: V): void {
 
 export function createGraphSnapshot(input: GraphInput): GraphSnapshot {
   const people = new Map<string, DescendancyPerson>();
-  for (const p of input.people) people.set(p.id, p);
+  // A missing isLiving counts as living (spec Part 1, step 5): never show more than we know.
+  for (const p of input.people) people.set(p.id, p.isLiving === undefined ? { ...p, isLiving: true } : p);
 
   const unions: SnapshotUnion[] = input.unions.map((u) => (hasId(u) ? u : { ...u, id: unionIdOf(u) }));
 

@@ -3,6 +3,7 @@
  * Phase 2: production code never imports test data.
  * Phase 3: no global "current builder"; the modules that build, lay out and reduce keep no
  * module-level mutable bindings (only debug/ timing instrumentation, opt-in, may).
+ * Phase 4: no app routes in code, and process.env is read only in src/env.ts (guarded).
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -48,4 +49,23 @@ describe("package boundaries", () => {
       .map((file) => relative(srcDir, file));
     expect(hits).toEqual([]);
   });
+
+  it("no app route URL in any string (phase 4)", () => {
+    const hits = sourceFiles(srcDir)
+      .filter((file) => /["'`]\/api\//.test(stripComments(readFileSync(file, "utf8"))))
+      .map((file) => relative(srcDir, file));
+    expect(hits).toEqual([]);
+  });
+
+  it("only env.ts reads process (phase 4)", () => {
+    const hits = sourceFiles(srcDir)
+      .filter((file) => relative(srcDir, file) !== "env.ts")
+      .filter((file) => /\bprocess\./.test(stripComments(readFileSync(file, "utf8"))))
+      .map((file) => relative(srcDir, file));
+    expect(hits).toEqual([]);
+  });
 });
+
+function stripComments(code: string): string {
+  return code.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+}

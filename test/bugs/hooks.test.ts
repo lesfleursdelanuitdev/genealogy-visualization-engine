@@ -9,94 +9,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, createElement, useRef } from "react";
 import { knownBug } from "../helpers/bugs";
-import { renderHook, settle, deferred, type Deferred } from "../helpers/renderHook";
-import { peopleOfAdapter, person } from "../helpers/graph";
-import { useChartViewFetch, usePanZoom, useDepth, type PanZoomBounds } from "../../src";
-
-// ─── fetch stub ──────────────────────────────────────────────────────────────
-
-interface FakeResponse {
-  ok: boolean;
-  status: number;
-  statusText: string;
-  json(): Promise<unknown>;
-}
-
-function ok(payload: unknown): FakeResponse {
-  return { ok: true, status: 200, statusText: "OK", json: () => Promise.resolve(payload) };
-}
-
-function rootParam(url: string): string {
-  return new URL(url, "http://localhost").searchParams.get("root") ?? "";
-}
+import { renderHook, settle } from "../helpers/renderHook";
+import { usePanZoom, useDepth, type PanZoomBounds } from "../../src";
 
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
-describe("H2: stale chart responses", () => {
-  knownBug("H2", "after a quick A→B root switch, A's late answer does not replace B's chart", async () => {
-    const pending = new Map<string, Deferred<FakeResponse>>();
-    vi.stubGlobal("fetch", (url: string) => {
-      const d = deferred<FakeResponse>();
-      pending.set(rootParam(url), d);
-      return d.promise;
-    });
-
-    const h = await renderHook((p: { root: string }) => useChartViewFetch("descendancy", p.root, 4), {
-      root: "@A@",
-    });
-    await h.rerender({ root: "@B@" });
-
-    pending.get("@B@")!.resolve(ok({ rootId: "@B@", people: [person("@B@", "Bea")], unions: [] }));
-    await settle();
-    pending.get("@A@")!.resolve(ok({ rootId: "@A@", people: [person("@A@", "Ann")], unions: [] }));
-    await settle();
-
-    expect(h.current.lastApiRootId).toBe("@B@");
-    expect(peopleOfAdapter(h.current.chartAdapter).has("@B@")).toBe(true);
-    await h.unmount();
-  });
-});
-
-describe("B07: loading flag", () => {
-  knownBug("B07", "a response that arrives before the 0 ms timer does not leave the chart loading", async () => {
-    vi.stubGlobal("fetch", () =>
-      Promise.resolve(ok({ rootId: "@A@", people: [person("@A@")], unions: [] }))
-    );
-    const h = await renderHook(() => useChartViewFetch("descendancy", "@A@", 4), undefined);
-    await settle();
-    expect(h.current.isChartLoading).toBe(false);
-    expect(h.current.lastApiRootId).toBe("@A@");
-    await h.unmount();
-  });
-
-  it("a slow response ends loading", async () => {
-    const d = deferred<FakeResponse>();
-    vi.stubGlobal("fetch", () => d.promise);
-    const h = await renderHook(() => useChartViewFetch("descendancy", "@A@", 4), undefined);
-    await settle();
-    expect(h.current.isChartLoading).toBe(true);
-    d.resolve(ok({ rootId: "@A@", people: [person("@A@")], unions: [] }));
-    await settle();
-    expect(h.current.isChartLoading).toBe(false);
-    await h.unmount();
-  });
-});
-
-describe("B14: living people", () => {
-  knownBug("B14", "a person with no isLiving in the payload counts as living", async () => {
-    vi.stubGlobal("fetch", () => {
-      const { isLiving: _omit, ...noLivingFlag } = person("@A@", "Ann");
-      return Promise.resolve(ok({ rootId: "@A@", people: [noLivingFlag], unions: [] }));
-    });
-    const h = await renderHook(() => useChartViewFetch("descendancy", "@A@", 4), undefined);
-    await settle();
-    expect(peopleOfAdapter(h.current.chartAdapter).get("@A@")?.isLiving).toBe(true);
-    await h.unmount();
-  });
-});
+// H2, B07 and B14 (chart fetching) are fixed; their tests are in test/fetch.test.ts and test/wire.test.ts.
 
 // ─── pan / zoom ──────────────────────────────────────────────────────────────
 

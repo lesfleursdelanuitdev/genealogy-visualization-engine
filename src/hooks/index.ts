@@ -6,7 +6,11 @@ export {
   type UseTreeIndividualsReturn,
   type IndividualSearchResult,
 } from "./useChartSearch";
-export { useChartViewFetch, type UseChartViewFetchResult } from "./useChartViewFetch";
+export {
+  useChartViewFetch,
+  type UseChartViewFetchResult,
+  type UseChartViewFetchOptions,
+} from "./useChartViewFetch";
 export {
   useDepth,
   type UseDepthOptions,

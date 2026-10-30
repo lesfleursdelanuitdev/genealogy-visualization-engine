@@ -27,9 +27,11 @@ describe("createInitialState", () => {
     expect(s.strategyName).toBe("descendancy");
   });
 
-  it("defaults rootId to DEFAULT_ROOT_XREF when no rootId supplied", () => {
+  // Changed in the engine package (spec Part 1 step 4: no Gonsalves default root). The app's
+  // original expected a truthy DEFAULT_ROOT_XREF here.
+  it("has an empty root when no rootId is supplied", () => {
     const s = createInitialState("descendancy");
-    expect(s.rootId).toBeTruthy();
+    expect(s.rootId).toBe("");
   });
 
   it("normalises a bare xref into @xref@ format", () => {

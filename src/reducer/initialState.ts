@@ -4,7 +4,7 @@
 
 import type { TreeState } from "./types";
 import type { FamilyUnitScope, ViewState } from "../types";
-import { DEFAULT_MAX_DEPTH, DEFAULT_ROOT_XREF } from "../constants";
+import { DEFAULT_MAX_DEPTH } from "../constants";
 import { getStrategyReducer } from "./strategies/registry";
 
 export type CreateInitialStateOptions = {
@@ -44,9 +44,9 @@ export function createInitialState(
   if (isPed && famc) {
     viewState = { ...viewState, pedigreeFamcFamilyXref: famc };
   }
-  const rawRoot = rootId?.trim() || DEFAULT_ROOT_XREF;
-  const initialRootId =
-    rawRoot === DEFAULT_ROOT_XREF ? rawRoot : normalizeGedcomXref(rawRoot) || rawRoot;
+  // No default root: an empty root means "nothing chosen yet" (the app or viewer picks one).
+  const rawRoot = rootId?.trim() ?? "";
+  const initialRootId = rawRoot ? normalizeGedcomXref(rawRoot) || rawRoot : "";
   const spouseSeed = options?.initialRevealSpouseXref?.trim();
   const familySeed = options?.initialFamilyXref?.trim();
   if (strategyName === "descendancy" && spouseSeed) {

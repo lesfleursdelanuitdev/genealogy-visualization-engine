@@ -5,8 +5,9 @@
  * Performance / Console to read `console.time` / `console.timeEnd` output.
  */
 
-const enabled =
-  typeof process !== "undefined" && process.env.NEXT_PUBLIC_DEBUG_CHART_SWITCH === "true";
+import { DEBUG_CHART_SWITCH } from "../env";
+
+const enabled = DEBUG_CHART_SWITCH;
 
 type ActiveSession = {
   id: number;
