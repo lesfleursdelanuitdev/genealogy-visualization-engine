@@ -68,10 +68,12 @@ export const fanChartDescriptor: ViewStrategyDescriptor = {
       thicknessIncreaseStartGeneration: FAN_CHART_DEFAULTS.thicknessIncreaseStartGeneration,
       thicknessIncreaseStep: FAN_CHART_DEFAULTS.thicknessIncreaseStep,
     });
+    // buildFanGeometry's default: centre (0, radius), angles π..2π, a half-disc above the
+    // centre. So x runs −radius..radius and y 0..radius (B11; was {0, radius, 2·radius}).
     return {
-      minX: 0,
+      minX: -radius,
       maxX: radius,
-      maxY: radius * 2,
+      maxY: radius,
     };
   },
   constants: {

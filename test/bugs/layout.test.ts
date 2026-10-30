@@ -22,21 +22,21 @@ import { pedigreeDescriptor } from "../../src/strategies/pedigree/pedigreeDescri
 const card = (id: string) => new PersonNode(person(id));
 
 describe("B06: card size options", () => {
-  knownBug("B06", "personWidth sets the spacing between sibling cards", () => {
+  it("[B06 fixed] personWidth sets the spacing between sibling cards", () => {
     const u = new NormalUnionNode(card("h"), card("w"), [card("c1"), card("c2"), card("c3")]);
     layout(u, { personWidth: 100 });
     const [c1, c2] = u.children;
     expect(c2.x - c1.x).toBe(100 + GAP);
   });
 
-  knownBug("B06", "personWidth sets the width of the bounds", () => {
+  it("[B06 fixed] personWidth sets the width of the bounds", () => {
     const solo = card("p");
     layout(solo, { personWidth: 100 });
     const b = getBounds(solo, { personWidth: 100 });
     expect(b.maxX - b.minX).toBe(100);
   });
 
-  knownBug("B06", "personHeight moves the pedigree connector points", () => {
+  it("[B06 fixed] personHeight moves the pedigree connector points", () => {
     const p = card("p");
     p.y = 0;
     const connectors = (pedigreeDescriptor as ViewStrategyDescriptor).getConnectors!(100);
@@ -52,7 +52,7 @@ describe("B06: card size options", () => {
 });
 
 describe("B11: fan-chart bounds", () => {
-  knownBug("B11", "match the drawn half-disc for a 3-generation fan", () => {
+  it("[B11 fixed] match the drawn half-disc for a 3-generation fan", () => {
     // Root with parents and grandparents: three generations of ancestors above the root.
     const g = graphOf({
       people: ["R", "F", "M", "FF", "FM", "MF", "MM", "FFF", "FFM"].map((id) => person(id)),
@@ -115,12 +115,12 @@ describe("B13: chosen parent family in the pedigree", () => {
     expect(parentsOf(root as PersonNode)).toEqual(["P1", "P2"]);
   });
 
-  knownBug("B13", "pedigreeFamcFamilyXref picks the root's parent family", () => {
+  it("[B13 fixed] pedigreeFamcFamilyXref picks the root's parent family", () => {
     const { root } = buildPedigree(adopted(), "C", { pedigreeFamcFamilyXref: "@FA@" });
     expect(parentsOf(root as PersonNode)).toEqual(["A1", "A2"]);
   });
 
-  knownBug("B13", "pedigreeFamcOverrides picks an ancestor's parent family", () => {
+  it("[B13 fixed] pedigreeFamcOverrides picks an ancestor's parent family", () => {
     // R's father is C, so the override applies one generation up.
     const g = graphOf({
       people: ["R", "C", "W", "P1", "P2", "A1", "A2"].map((id) => person(id)),

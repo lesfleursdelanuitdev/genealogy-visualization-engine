@@ -10,6 +10,7 @@ import {
 } from "./constants";
 import type { LayoutBoundsOptions } from "../ViewStrategyDescriptor";
 import type { ChartNode } from "../../nodes";
+import { personWidthOf } from "./layout";
 import {
   UnionNode,
   NormalUnionNode,
@@ -28,22 +29,16 @@ export function collectAll(node: ChartNode, acc: ChartNode[] = []): ChartNode[] 
   return acc;
 }
 
-export function visualHalfWidth(node: ChartNode): number {
-  if (node.type === "person") return PERSON_WIDTH / 2;
-  if (node instanceof CatchAllNode) {
-    return Math.max(DIAMOND_SIZE, CONNECTOR_WIDTH / 2 + PERSON_WIDTH);
-  }
+export function visualHalfWidth(node: ChartNode, personWidth: number = PERSON_WIDTH): number {
+  if (node.type === "person") return personWidth / 2;
   if (
     node instanceof LinkedParentNode ||
     node instanceof SiblingAdoptiveUnionNode ||
     (node instanceof NormalUnionNode && node._isPrimary)
   ) {
-    return (PERSON_WIDTH + CONNECTOR_WIDTH + PERSON_WIDTH) / 2;
+    return (personWidth + CONNECTOR_WIDTH + personWidth) / 2;
   }
-  if (node instanceof NormalUnionNode) {
-    return Math.max(DIAMOND_SIZE, CONNECTOR_WIDTH / 2 + PERSON_WIDTH);
-  }
-  return Math.max(DIAMOND_SIZE, CONNECTOR_WIDTH / 2 + PERSON_WIDTH);
+  return Math.max(DIAMOND_SIZE, CONNECTOR_WIDTH / 2 + personWidth);
 }
 
 export interface Bounds {
@@ -54,11 +49,12 @@ export interface Bounds {
 
 export function getBounds(root: ChartNode, options?: LayoutBoundsOptions): Bounds {
   const personHeight = options?.personHeight ?? PERSON_HEIGHT;
+  const personWidth = personWidthOf(options);
   let minX = Infinity;
   let maxX = -Infinity;
   let maxY = -Infinity;
   for (const n of collectAll(root)) {
-    const half = visualHalfWidth(n);
+    const half = visualHalfWidth(n, personWidth);
     minX = Math.min(minX, n.x - half);
     maxX = Math.max(maxX, n.x + half);
     const halfY = n.type === "person" ? personHeight / 2 : DIAMOND_SIZE;

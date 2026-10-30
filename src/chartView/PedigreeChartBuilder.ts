@@ -49,8 +49,21 @@ export class PedigreeChartBuilder implements ChartViewBuildAdapter {
   }
 
   buildTreeResult(rootId: string, viewState: ViewState, maxDepth: number): BuildTreeResult {
-    const people = this.graph.people;
-    const birthByChild = this.graph.birthUnionByChild;
+    const graph = this.graph;
+    const people = graph.people;
+    const famcOverrides = viewState.pedigreeFamcOverrides ?? {};
+    const rootFamc = (viewState.pedigreeFamcFamilyXref ?? "").trim() || null;
+
+    /**
+     * The family to climb from `id` (B13): the root's chosen family, or a chosen family for an
+     * ancestor, when it really lists `id` as a child; otherwise the birth family (T20).
+     */
+    const parentFamilyOf = (id: string, gen: number) => {
+      const chosen = (gen === 0 ? rootFamc ?? famcOverrides[id] : famcOverrides[id]) ?? null;
+      const u = chosen ? graph.unionById.get(chosen) : undefined;
+      if (u && u.children.some((c) => c.id === id)) return u;
+      return graph.birthUnionByChild.get(id);
+    };
     const effectiveDepth = viewState.currentDepth ?? maxDepth;
     const collapseAbovePersonId = (viewState.pedigreeAncestorCollapsePersonId ?? "").trim() || null;
 
@@ -77,7 +90,7 @@ export class PedigreeChartBuilder implements ChartViewBuildAdapter {
       if (gen >= effectiveDepth) {
         return new PersonNode({ ...raw, _onlyRoot: gen === 0 }, []);
       }
-      const u = birthByChild.get(id);
+      const u = parentFamilyOf(id, gen);
       if (!u) {
         return new PersonNode({ ...raw, _onlyRoot: gen === 0 }, []);
       }

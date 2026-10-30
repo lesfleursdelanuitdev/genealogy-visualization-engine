@@ -64,11 +64,16 @@ export function outgoingY(node: ChartNode): number {
   return node.y + PERSON_HEIGHT / 2;
 }
 
-/** Connector helpers that use a given person height (for dynamic card height from display settings). */
-export function getConnectors(personHeight: number): ConnectorHelpers {
+/** Connector helpers for a given card height and width (display settings). */
+export function getConnectors(personHeight: number, personWidth: number = PERSON_WIDTH): ConnectorHelpers {
+  const incomingXFor = (node: ChartNode): number => {
+    if (node instanceof UnionNode) return node.x - CONNECTOR_WIDTH / 2 - personWidth / 2;
+    if (isContainer(node) && node.children.length > 0) return incomingXFor(node.children[0]);
+    return node.x;
+  };
   return {
     hasIncomingConnector,
-    incomingX,
+    incomingX: incomingXFor,
     incomingY(node: ChartNode) {
       return node.y - personHeight / 2;
     },

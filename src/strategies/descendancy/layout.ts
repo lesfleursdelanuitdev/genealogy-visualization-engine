@@ -9,9 +9,15 @@ import type { ChartNode } from "../../nodes";
 import { PersonNode, UnionNode, NormalUnionNode } from "../../nodes";
 import type { LayoutBoundsOptions } from "../ViewStrategyDescriptor";
 
-function computeWidths(node: ChartNode): void {
-  for (const child of node.children) computeWidths(child);
-  node._computedWidth = node.computedWidth(GAP);
+function computeWidths(node: ChartNode, personWidth: number): void {
+  for (const child of node.children) computeWidths(child, personWidth);
+  node._computedWidth = node.computedWidth(GAP, personWidth);
+}
+
+/** Card width from layout options: a positive finite personWidth, else PERSON_WIDTH. */
+export function personWidthOf(options?: LayoutBoundsOptions): number {
+  const w = options?.personWidth;
+  return typeof w === "number" && Number.isFinite(w) && w > 0 ? w : PERSON_WIDTH;
 }
 
 /** PersonNode whose children are all UnionNodes (unions rendered at same depth). */
@@ -59,10 +65,8 @@ function assignPositions(
 
 export function layout(root: ChartNode, options?: LayoutBoundsOptions): void {
   const personHeight = options?.personHeight ?? PERSON_HEIGHT;
-  const personWidth = Number.isFinite(options?.personWidth) && options!.personWidth! > 0
-    ? options!.personWidth!
-    : PERSON_WIDTH;
-  computeWidths(root);
+  const personWidth = personWidthOf(options);
+  computeWidths(root, personWidth);
   assignPositions(root, 0, 0, personHeight, personWidth);
 }
 

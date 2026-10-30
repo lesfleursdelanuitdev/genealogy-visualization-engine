@@ -7,7 +7,6 @@ import { Node } from "./Node";
 import type { PersonNode } from "./PersonNode";
 import type { ChartNode, IUnionNode } from "./types";
 
-const UNION_CARD_WIDTH = PERSON_WIDTH + CONNECTOR_WIDTH + PERSON_WIDTH;
 
 /** Abstract base for all union variants. Implements IUnionNode. */
 export abstract class UnionNode
@@ -30,15 +29,10 @@ export abstract class UnionNode
     return this.content[1];
   }
 
-  computedWidth(_gap: number): number {
-    if (this.children.length === 0) return UNION_CARD_WIDTH;
-    const total = this.children.reduce(
-      (sum, c) => sum + c._computedWidth,
-      0
-    );
-    return Math.max(
-      UNION_CARD_WIDTH,
-      total + (this.children.length - 1) * _gap
-    );
+  computedWidth(gap: number, personWidth: number = PERSON_WIDTH): number {
+    const cardWidth = personWidth + CONNECTOR_WIDTH + personWidth;
+    if (this.children.length === 0) return cardWidth;
+    const total = this.children.reduce((sum, c) => sum + c._computedWidth, 0);
+    return Math.max(cardWidth, total + (this.children.length - 1) * gap);
   }
 }

@@ -18,5 +18,6 @@ export abstract class Node<T> {
     this.children = children;
   }
 
-  abstract computedWidth(gap: number): number;
+  /** Width this node needs: its own card, or its children's widths plus gaps. */
+  abstract computedWidth(gap: number, personWidth?: number): number;
 }

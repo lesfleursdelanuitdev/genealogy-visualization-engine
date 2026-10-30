@@ -5,6 +5,7 @@
 import type { ConnectorHelpers } from "../ViewStrategyDescriptor";
 import type { LayoutBoundsOptions } from "../ViewStrategyDescriptor";
 import {
+  getConnectors as dGetConnectors,
   hasIncomingConnector as dHasIncoming,
   incomingX as dIncomingX,
   incomingY as dIncomingY,
@@ -28,11 +29,8 @@ export const pedigreeConnectors: ConnectorHelpers = {
   isContainer: (node: ChartNode) => dIsContainer(node) || isPedigreeContainer(node),
 };
 
-export function getPedigreeConnectors(_personHeight: number): ConnectorHelpers {
-  return pedigreeConnectors;
-}
-
-export function getPedigreeConnectorsWithHeight(personHeight: number): ConnectorHelpers {
-  void personHeight;
-  return pedigreeConnectors;
+/** Pedigree connectors for a given card height and width (B06: these were ignored). */
+export function getPedigreeConnectors(personHeight: number, personWidth?: number): ConnectorHelpers {
+  const d = dGetConnectors(personHeight, personWidth);
+  return { ...d, isContainer: (node: ChartNode) => dIsContainer(node) || isPedigreeContainer(node) };
 }

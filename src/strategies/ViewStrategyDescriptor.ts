@@ -87,8 +87,8 @@ export interface ViewStrategyDescriptor {
   /** Connector geometry and visibility for drawing lines. */
   connectors: ConnectorHelpers;
 
-  /** Optional: return connector helpers that use the given person height (for dynamic card height). */
-  getConnectors?(personHeight: number): ConnectorHelpers;
+  /** Optional: connector helpers for a given card height (and width) from display settings. */
+  getConnectors?(personHeight: number, personWidth?: number): ConnectorHelpers;
 
   /** Compute bounding box of the laid-out tree. */
   getBounds(root: ChartNode, options?: LayoutBoundsOptions): Bounds;

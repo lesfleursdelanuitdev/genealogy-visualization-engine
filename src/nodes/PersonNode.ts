@@ -15,15 +15,9 @@ export class PersonNode extends Node<DescendancyPerson> {
     super("person", person, children);
   }
 
-  computedWidth(_gap: number): number {
-    if (this.children.length === 0) return PERSON_WIDTH;
-    const total = this.children.reduce(
-      (sum, c) => sum + c._computedWidth,
-      0
-    );
-    return Math.max(
-      PERSON_WIDTH,
-      total + (this.children.length - 1) * _gap
-    );
+  computedWidth(gap: number, personWidth: number = PERSON_WIDTH): number {
+    if (this.children.length === 0) return personWidth;
+    const total = this.children.reduce((sum, c) => sum + c._computedWidth, 0);
+    return Math.max(personWidth, total + (this.children.length - 1) * gap);
   }
 }

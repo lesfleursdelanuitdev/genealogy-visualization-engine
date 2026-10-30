@@ -20,5 +20,5 @@ export interface IUnionNode {
   _computedWidth: number;
   readonly left: PersonNode;
   readonly right: PersonNode | null;
-  computedWidth(gap: number): number;
+  computedWidth(gap: number, personWidth?: number): number;
 }
