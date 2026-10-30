@@ -14,7 +14,19 @@ import {
   type UnionNode,
 } from "../../nodes";
 import type { ViewState, LinkedUnionEntry, UnionRecord } from "../../types";
-import type { GraphSnapshot } from "../../graph";
+import { isUnknownPartnerId, type GraphSnapshot } from "../../graph";
+
+/**
+ * Whether `partnerId` (from a union) is the revealed `spouseId`. A revealed "" comes from
+ * history saved before per-family placeholders (H4): it means that family's unknown partner.
+ */
+function isRevealedPartner(partnerId: string, spouseId: string): boolean {
+  return partnerId === spouseId || (spouseId === "" && isUnknownPartnerId(partnerId));
+}
+
+function partnerOf(u: UnionRecord, personId: string): string {
+  return u.husb === personId ? u.wife : u.husb;
+}
 import { shouldSkipCatchAllForFamilyUnit } from "../../reducer/strategies/descendancy/familyUnitScope";
 import type { BuildContext, ViewStrategy } from "../ViewStrategy";
 
@@ -29,9 +41,7 @@ function unionsBetweenPartners(
   familyXref?: string | null
 ): readonly UnionRecord[] {
   const matching = allUnions.filter(
-    (u) =>
-      (u.husb === personId && u.wife === spouseId) ||
-      (u.husb === spouseId && u.wife === personId)
+    (u) => (u.husb === personId || u.wife === personId) && isRevealedPartner(partnerOf(u, personId), spouseId)
   );
   const fam = familyXref?.trim();
   if (fam) {
@@ -83,8 +93,8 @@ export class DescendancyViewStrategy implements ViewStrategy {
       const unions = unionsBetweenPartners(allUnions, personId, spouseId, scopedFamilyXref);
       const basePerson = people.get(personId);
       if (unions.length === 0 || !basePerson) return [];
-      const rightPerson = people.get(spouseId) ?? null;
       const unionNodes = unions.map((union) => {
+        const rightPerson = people.get(partnerOf(union, personId)) ?? null;
         const leftNode = new PersonNode({ ...basePerson, _onlyRoot: false });
         const rightNode = rightPerson ? new PersonNode({ ...rightPerson, _onlyRoot: false }) : null;
         const childNodes = union.children
@@ -97,7 +107,7 @@ export class DescendancyViewStrategy implements ViewStrategy {
 
     const revealedUnionIds = new Set(
       allUnions
-        .filter((u) => spouseIds.includes(u.husb === personId ? u.wife : u.husb))
+        .filter((u) => spouseIds.some((s) => isRevealedPartner(partnerOf(u, personId), s)))
         .map((u) => u.id ?? "")
     );
 

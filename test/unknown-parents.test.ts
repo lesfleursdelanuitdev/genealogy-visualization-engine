@@ -3,7 +3,7 @@
  * birth-family lookup uses the snapshot's one rule (T20).
  */
 import { describe, it, expect } from "vitest";
-import { graphOf, reduce, emptyState, buildPedigree, person, union } from "./helpers/graph";
+import { graphOf, reduce, emptyState, buildPedigree, buildDescendancy, person, union } from "./helpers/graph";
 import { NormalUnionNode, PersonNode, type ViewState } from "../src";
 
 describe("unknown parents", () => {
@@ -43,5 +43,15 @@ describe("unknown parents", () => {
     expect(reduce(g, emptyState("C"), { type: "PARENTS", personId: "C" }).rootId).toBe("A");
     const { root } = buildPedigree(g, "C");
     expect(((root as PersonNode).children[0] as NormalUnionNode).left.content.id).toBe("A");
+  });
+});
+
+describe("saved history from before per-family placeholders", () => {
+  it('a revealed partner "" (an unknown father in an old saved entry) still shows that family', () => {
+    const g = graphOf({ people: [person("M"), person("C")], unions: [union("@F1@", "", "M", ["C"])] });
+    const { root } = buildDescendancy(g, "M", { revealedUnions: new Map([["M", [""]]]) });
+    const row = (root as PersonNode).children[0] as NormalUnionNode;
+    expect(row.right?.content.id).toBe("@F1@:unknown-husb");
+    expect(row.children.map((c) => (c as PersonNode).content.id)).toEqual(["C"]);
   });
 });
