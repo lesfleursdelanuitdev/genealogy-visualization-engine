@@ -52,12 +52,11 @@ describe("B09: closing a partner", () => {
       ]),
     });
 
-  knownBug("B09", "closes S only on the row it was closed from", () => {
+  it("[B09 fixed] closes S only on the row it was closed from", () => {
     const g = graphOf({
       people: ["R", "A", "B", "S"].map((id) => person(id)),
       unions: [union("@F1@", "A", "S", []), union("@F2@", "B", "S", [])],
     });
-    // @ts-expect-error CLOSE_SPOUSE carries no row (personId) yet; the fix adds it (bug B09).
     const s1 = reduce(g, twoRows(), { type: "CLOSE_SPOUSE", personId: "B", spouseId: "S" });
     expect(vs(s1).revealedUnions?.get("A")).toEqual(["S"]);
     expect(vs(s1).revealedUnions?.get("B") ?? []).not.toContain("S");
@@ -66,8 +65,25 @@ describe("B09: closing a partner", () => {
   it("with one partner per row, closes only that partner", () => {
     const g = family();
     const s0 = emptyState("R", { revealedUnions: new Map([["R", ["S", "X"]]]) });
-    const s1 = reduce(g, s0, { type: "CLOSE_SPOUSE", spouseId: "S" });
+    const s1 = reduce(g, s0, { type: "CLOSE_SPOUSE", personId: "R", spouseId: "S" });
     expect(vs(s1).revealedUnions?.get("R")).toEqual(["X"]);
+  });
+
+  it("pushes a labelled 'Close partner' entry for the row's person (T19)", () => {
+    const s0 = emptyState("R", { revealedUnions: new Map([["R", ["S"]]]) });
+    const s1 = reduce(family(), s0, { type: "CLOSE_SPOUSE", personId: "R", spouseId: "S" });
+    expect(s1.history).toHaveLength(2);
+    expect(s1.history[1]).toMatchObject({
+      actionLabel: "Close partner",
+      triggerPersonId: "R",
+      triggerPersonFullName: "R Test",
+      triggerPersonInitials: "RT",
+    });
+  });
+
+  it("closing a partner that is not open on that row changes nothing", () => {
+    const s0 = emptyState("R", { revealedUnions: new Map([["R", ["S"]]]) });
+    expect(reduce(family(), s0, { type: "CLOSE_SPOUSE", personId: "C1", spouseId: "S" })).toBe(s0);
   });
 });
 
@@ -93,19 +109,19 @@ describe("B12: initials", () => {
       unions: [],
     });
 
-  knownBug("B12", "takes the first character, not half of a UTF-16 pair", () => {
+  it("[B12 fixed] takes the first character, not half of a UTF-16 pair", () => {
     const s1 = reduce(names(), emptyState("R"), { type: "ROOT", personId: "@I1@" });
     expect(s1.history[s1.historyIndex].rootPersonInitials).toBe("\u{20BB7}T");
   });
 
-  knownBug("B12", "keeps a combining accent with its letter", () => {
+  it("[B12 fixed] keeps a combining accent with its letter", () => {
     const s1 = reduce(names(), emptyState("R"), { type: "ROOT", personId: "@I2@" });
     expect(s1.history[s1.historyIndex].rootPersonInitials).toBe("ÉÉ");
   });
 });
 
 describe("S1 (suspected): root change keeping the old scope", () => {
-  knownBug("S1", "Show parents on the root drops the old root's family-unit scope", () => {
+  it("[S1 fixed] Show parents on the root drops the old root's family-unit scope", () => {
     const g = graphOf({
       people: ["P", "Q", "R", "S"].map((id) => person(id)),
       unions: [union("@F0@", "P", "Q", ["R"]), union("@F1@", "R", "S", [])],
@@ -127,7 +143,7 @@ describe("S1 (suspected): root change keeping the old scope", () => {
 });
 
 describe("S2 (suspected): panToPersonId never cleared", () => {
-  knownBug("S2", "the next action after Pan to person does not carry the pan target", () => {
+  it("[S2 fixed] the next action after Pan to person does not carry the pan target", () => {
     const g = family();
     const s1 = reduce(g, emptyState("R"), { type: "PAN_TO_PERSON", personId: "C2" });
     expect(vs(s1).panToPersonId).toBe("C2");

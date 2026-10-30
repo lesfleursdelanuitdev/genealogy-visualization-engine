@@ -26,7 +26,10 @@ const handlers: Record<DescendancyAction["type"], Handler> = {
     const d = a as Extract<DescendancyAction, { type: "REVEAL_SPOUSE" }>;
     return applyRevealSpouse(s, d.personId, d.spouseId, graph);
   },
-  CLOSE_SPOUSE: (s, a) => applyCloseSpouse(s, (a as Extract<DescendancyAction, { type: "CLOSE_SPOUSE" }>).spouseId),
+  CLOSE_SPOUSE: (s, a, graph) => {
+    const d = a as Extract<DescendancyAction, { type: "CLOSE_SPOUSE" }>;
+    return applyCloseSpouse(s, d.personId, d.spouseId, graph);
+  },
   REVEAL_ALL_SPOUSES: (s, _a, graph) => applyRevealAllSpouses(s, graph),
   CLOSE_ALL_SPOUSES: (s) => applyCloseAllSpouses(s),
   CLOSE_LINKED_UNION: (s, a) => applyCloseLinkedUnion(s, (a as Extract<DescendancyAction, { type: "CLOSE_LINKED_UNION" }>).personId),

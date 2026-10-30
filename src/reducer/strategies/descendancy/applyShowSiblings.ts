@@ -2,6 +2,7 @@ import type { GraphSnapshot } from "../../../graph";
 import type { TreeState } from "../../types";
 import type { ViewState } from "../../../types";
 import { pushHistory } from "../../pushHistory";
+import { initialLetters } from "../../personText";
 
 /**
  * Sets root and minimal siblingView (personId + placeholder arrays).
@@ -40,13 +41,13 @@ export function applyShowSiblings(state: TreeState, personId: string, graph: Gra
       ? `${personForLabel.firstName ?? ""} ${personForLabel.lastName ?? ""}`.trim()
       : null) || personId;
   const triggerInitials = personForLabel
-    ? ((personForLabel.firstName?.trim() || "")[0] ?? "") + ((personForLabel.lastName?.trim() || "")[0] ?? "")
+    ? initialLetters(personForLabel)
     : "?";
   const rootPerson = people.get(newRoot);
   const rootFullName =
     (rootPerson ? `${rootPerson.firstName ?? ""} ${rootPerson.lastName ?? ""}`.trim() : null) || newRoot;
   const rootInitials = rootPerson
-    ? ((rootPerson.firstName?.trim() || "")[0] ?? "") + ((rootPerson.lastName?.trim() || "")[0] ?? "")
+    ? initialLetters(rootPerson)
     : "?";
   const actionLabel = `Show parents & siblings of ${personFullName}`;
   const hist = pushHistory(state, newRoot, newViewState, actionLabel, personId, {

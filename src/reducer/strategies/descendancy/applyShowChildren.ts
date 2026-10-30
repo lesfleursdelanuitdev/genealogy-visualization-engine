@@ -11,6 +11,7 @@ import type { ViewState } from "../../../types";
 import type { GraphSnapshot } from "../../../graph";
 import { pushHistory } from "../../pushHistory";
 import { clampDepth } from "./applySetCurrentDepth";
+import { initialLetters } from "../../personText";
 
 function viewState(state: TreeState): ViewState {
   return state.viewState as ViewState;
@@ -19,7 +20,7 @@ function viewState(state: TreeState): ViewState {
 function triggerDisplay(graph: GraphSnapshot, personId: string) {
   const p = graph.people.get(personId);
   const fullName = (p ? `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim() : null) || personId;
-  const initials = p ? ((p.firstName?.trim() || "")[0] ?? "") + ((p.lastName?.trim() || "")[0] ?? "") : "?";
+  const initials = p ? initialLetters(p) : "?";
   return { triggerPersonFullName: fullName, triggerPersonInitials: (initials || "?").toUpperCase() };
 }
 

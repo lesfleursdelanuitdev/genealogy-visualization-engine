@@ -2,6 +2,8 @@ import type { GraphSnapshot } from "../../../graph";
 import type { UnionRecord, ViewState } from "../../../types";
 import type { TreeState } from "../../types";
 import { pushHistory } from "../../pushHistory";
+import { withoutFamilyUnitScope } from "./familyUnitScope";
+import { initialLetters } from "../../personText";
 
 function viewState(state: TreeState): ViewState {
   return state.viewState as ViewState;
@@ -57,8 +59,9 @@ function applyParentsAsRoot(
     }
   }
 
+  // The chart gets a new root, so the old root's family-unit scope no longer applies (S1).
   const newViewState: ViewState = {
-    ...vs,
+    ...withoutFamilyUnitScope(vs),
     revealedUnions: nextRevealed,
     linkedUnions: nextLinked,
     displayDepth: undefined,
@@ -68,13 +71,13 @@ function applyParentsAsRoot(
   const newRootFullName =
     (p ? `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim() : null) || primaryParent;
   const newRootInitialsStr =
-    (p ? ((p.firstName?.trim() || "")[0] ?? "") + ((p.lastName?.trim() || "")[0] ?? "") : "") ||
+    (p ? initialLetters(p) : "") ||
     (/^@I[^@]*@$/.test(primaryParent) ? "?" : primaryParent.slice(0, 2));
   const triggerP = people.get(personId);
   const triggerFullName =
     (triggerP ? `${triggerP.firstName ?? ""} ${triggerP.lastName ?? ""}`.trim() : null) || personId;
   const triggerInitials = triggerP
-    ? ((triggerP.firstName?.trim() || "")[0] ?? "") + ((triggerP.lastName?.trim() || "")[0] ?? "")
+    ? initialLetters(triggerP)
     : "?";
   const actionLabel = `Show parents, make ${newRootFullName} root`;
   const hist = pushHistory(state, primaryParent, newViewState, actionLabel, personId, {

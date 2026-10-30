@@ -16,6 +16,7 @@ import { registerPedigreeReducer } from "./strategies/pedigree";
 import { registerVerticalPedigreeReducer } from "./strategies/verticalPedigree";
 import { registerFanChartReducer } from "./strategies/fanChart";
 import { EMPTY_GRAPH, type GraphSnapshot } from "../graph";
+import type { ViewState } from "../types";
 
 registerDescendancyReducer();
 registerPedigreeReducer();
@@ -33,15 +34,40 @@ export function treeReducer(
   action: TreeAction,
   graph: GraphSnapshot = EMPTY_GRAPH
 ): TreeState {
+  const base = withoutStalePanTarget(state, action);
+  const next = reduceAction(base, action, graph);
+  return next === base ? state : next;
+}
+
+function reduceAction(state: TreeState, action: TreeAction, graph: GraphSnapshot): TreeState {
   if (isCoreAction(action)) {
     const handler = coreHandlers[action.type];
     return handler ? handler(state, action, graph) : state;
   }
   const strategy = getStrategyReducer(state.strategyName);
-  if (strategy) {
-    return strategy.reduce(state, action, graph);
-  }
-  return state;
+  return strategy ? strategy.reduce(state, action, graph) : state;
+}
+
+/** Actions that move through history; they restore an entry's view state as it was. */
+const HISTORY_MOVES = new Set<TreeAction["type"]>([
+  "BACK",
+  "FORWARD",
+  "NAVIGATE_TO_INDEX",
+  "CLEAR_HISTORY",
+  "RESTORE_HISTORY",
+]);
+
+/**
+ * A pan target belongs to its "Pan to person" entry only (S2): before any other action, drop
+ * it from the current view so the action's new entry doesn't carry it on. History moves keep
+ * it, so going back to that entry pans again.
+ */
+function withoutStalePanTarget(state: TreeState, action: TreeAction): TreeState {
+  if (action.type === "PAN_TO_PERSON" || HISTORY_MOVES.has(action.type)) return state;
+  const v = state.viewState as ViewState | null | undefined;
+  if (v == null || typeof v !== "object" || v.panToPersonId === undefined) return state;
+  const { panToPersonId: _dropped, ...rest } = v;
+  return { ...state, viewState: rest };
 }
 
 /** A `(state, action) => state` reducer bound to one chart's graph (for useReducer). */

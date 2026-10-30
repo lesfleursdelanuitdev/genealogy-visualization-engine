@@ -3,6 +3,7 @@ import type { ViewState } from "../../../types";
 import type { GraphSnapshot } from "../../../graph";
 import { pushHistory } from "../../pushHistory";
 import { withoutFamilyUnitScope } from "./familyUnitScope";
+import { initialLetters } from "../../personText";
 
 function viewState(state: TreeState): ViewState {
   return state.viewState as ViewState;
@@ -40,7 +41,7 @@ export function applyCloseAllSpousesForPerson(
   const personName = getFullName(graph, personId);
   const person = graph.people.get(personId);
   const initials = person
-    ? ((person.firstName?.trim() || "")[0] ?? "") + ((person.lastName?.trim() || "")[0] ?? "")
+    ? initialLetters(person)
     : "?";
   const actionLabel = `Close all partners of ${personName}`;
   const hist = pushHistory(state, state.rootId, newViewState, actionLabel, personId, {

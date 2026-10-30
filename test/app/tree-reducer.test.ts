@@ -301,7 +301,9 @@ describe("CLOSE_SPOUSE action", () => {
   it("removes a previously revealed spouse", () => {
     let s = rootState("@I1@");
     s = treeReducer(s, { type: "REVEAL_SPOUSE", personId: "@I1@", spouseId: "@I2@" });
-    s = treeReducer(s, { type: "CLOSE_SPOUSE", spouseId: "@I2@" });
+    // Changed in the engine package (T19): CLOSE_SPOUSE names the row's person. The app's
+    // original sent { spouseId } only.
+    s = treeReducer(s, { type: "CLOSE_SPOUSE", personId: "@I1@", spouseId: "@I2@" });
     const vs = s.viewState as { revealedUnions?: Map<string, string[]> };
     const revealed = vs.revealedUnions?.get("@I1@") ?? [];
     expect(revealed).not.toContain("@I2@");

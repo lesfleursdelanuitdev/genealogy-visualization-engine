@@ -43,6 +43,8 @@ export interface HandlePersonCardActionContext {
   rootId?: string;
   /** Current view state; used by closeSpouse to find partner before panning to them. */
   viewState?: ViewState;
+  /** closeSpouse: the person whose partner row the card is on (T19). Without it, the first row that has the partner open. */
+  rowPersonId?: string;
   /** Schedule pan to center on this person after the next tree layout (e.g. after open/close spouse). */
   scheduleCenterOnPerson?: (personId: string) => void;
 }

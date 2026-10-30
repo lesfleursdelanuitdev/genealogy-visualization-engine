@@ -37,9 +37,9 @@ export function handlePersonCardAction(
   }
 
   if (action === "closeSpouse") {
+    let partnerId = ctx.rowPersonId;
     const revealedUnions = ctx.viewState?.revealedUnions;
-    let partnerId: string | undefined;
-    if (revealedUnions) {
+    if (partnerId == null && revealedUnions) {
       for (const [ownerId, spouseIds] of revealedUnions) {
         if (spouseIds.includes(personId)) {
           partnerId = ownerId;
@@ -47,8 +47,9 @@ export function handlePersonCardAction(
         }
       }
     }
-    dispatch({ type: "CLOSE_SPOUSE", spouseId: personId });
-    if (partnerId) ctx.scheduleCenterOnPerson?.(partnerId);
+    if (partnerId == null) return;
+    dispatch({ type: "CLOSE_SPOUSE", personId: partnerId, spouseId: personId });
+    ctx.scheduleCenterOnPerson?.(partnerId);
     return;
   }
 

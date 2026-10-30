@@ -7,7 +7,8 @@ import type { SiblingView } from "../../../types";
 
 export type DescendancyAction =
   | { type: "REVEAL_SPOUSE"; personId: string; spouseId: string }
-  | { type: "CLOSE_SPOUSE"; spouseId: string }
+  /** Close `spouseId` on `personId`'s partner row (T19). */
+  | { type: "CLOSE_SPOUSE"; personId: string; spouseId: string }
   | { type: "REVEAL_ALL_SPOUSES" }
   | { type: "CLOSE_ALL_SPOUSES" }
   | { type: "CLOSE_LINKED_UNION"; personId: string }

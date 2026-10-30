@@ -3,13 +3,14 @@
  */
 
 import type { GraphSnapshot } from "../graph";
+import { initialLetters } from "./personText";
 
 export function getPersonDisplay(graph: GraphSnapshot, personId: string): { fullName: string; initials: string } {
   const p = graph.people.get(personId);
   const fullName =
     (p ? `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim() : null) || personId;
   const initials = p
-    ? ((p.firstName?.trim() || "")[0] ?? "") + ((p.lastName?.trim() || "")[0] ?? "")
+    ? initialLetters(p)
     : /^@I[^@]*@$/.test(personId)
       ? "?"
       : personId.slice(0, 2);
