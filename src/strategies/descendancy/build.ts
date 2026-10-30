@@ -5,33 +5,33 @@
 import type { GraphSnapshot } from "../../graph";
 
 /**
- * Memoised counts, one cache per snapshot. A snapshot never changes, so the cache lives
- * exactly as long as the data it describes (before: one module-wide cache cleared on fetch).
+ * Finished counts, one cache per snapshot. A snapshot never changes, and each count is a
+ * fresh walk, so a cached value never depends on what was counted before (B05).
  */
 const descendantCountCache = new WeakMap<GraphSnapshot, Map<string, number>>();
 
-function cacheFor(graph: GraphSnapshot): Map<string, number> {
+/**
+ * Number of different people who descend from `personId` in `graph`, each counted once even
+ * when they descend through two lines (pedigree collapse). The person is not counted.
+ */
+export function countDescendants(graph: GraphSnapshot, personId: string): number {
   let cache = descendantCountCache.get(graph);
   if (!cache) {
     cache = new Map();
     descendantCountCache.set(graph, cache);
   }
-  return cache;
-}
-
-/** Number of descendants of `personId` in `graph`, for the "+N" badge at the depth limit. */
-export function countDescendants(
-  graph: GraphSnapshot,
-  personId: string,
-  visited = new Set<string>()
-): number {
-  if (visited.has(personId)) return 0;
-  const cache = cacheFor(graph);
   const cached = cache.get(personId);
   if (cached !== undefined) return cached;
-  visited.add(personId);
-  const childIds = graph.childrenOf(personId);
-  const count = childIds.reduce((sum, id) => sum + 1 + countDescendants(graph, id, visited), 0);
+
+  const seen = new Set<string>([personId]);
+  const stack = [...graph.childrenOf(personId)];
+  while (stack.length > 0) {
+    const id = stack.pop()!;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    for (const c of graph.childrenOf(id)) if (!seen.has(c)) stack.push(c);
+  }
+  const count = seen.size - 1;
   cache.set(personId, count);
   return count;
 }

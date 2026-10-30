@@ -60,7 +60,7 @@ describe("H4: unknown partners", () => {
 });
 
 describe("B04: two FAM records for the same couple", () => {
-  knownBug("B04", "shows the children of both families when the partner is revealed", () => {
+  it("[B04 fixed] shows the children of both families when the partner is revealed", () => {
     const g = graphOf({
       people: [person("H"), person("W"), person("A"), person("B")],
       unions: [union("@F1@", "H", "W", ["A"]), union("@F2@", "H", "W", ["B"])],
@@ -101,11 +101,11 @@ describe("B05: +N hidden descendant counts", () => {
     expect(hiddenCounter(cousins())("D")).toBe(2);
   });
 
-  knownBug("B05", "counts each descendant once under pedigree collapse", () => {
+  it("[B05 fixed] counts each descendant once under pedigree collapse", () => {
     expect(hiddenCounter(cousins())("R")).toBe(6);
   });
 
-  knownBug("B05", "gives the same count for a person whatever was counted before", () => {
+  it("[B05 fixed] gives the same count for a person whatever was counted before", () => {
     const count = hiddenCounter(cousins());
     count("R");
     expect(count("D")).toBe(2);
@@ -113,7 +113,7 @@ describe("B05: +N hidden descendant counts", () => {
 });
 
 describe("B10: depth cap", () => {
-  knownBug("B10", "a revealed partner row at the depth cap does not add a generation below the cap", () => {
+  it("[B10 fixed] a revealed partner row at the depth cap does not add a generation below the cap", () => {
     const g = graphOf({
       people: ["R", "S", "C", "D", "E"].map((id) => person(id)),
       unions: [union("@F1@", "R", "S", ["C"]), union("@F2@", "C", "D", ["E"])],

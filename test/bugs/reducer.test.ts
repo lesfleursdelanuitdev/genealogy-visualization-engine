@@ -18,20 +18,20 @@ const family = () =>
   });
 
 describe("B03: Show children at the depth cap", () => {
-  // At the cap the reducer "promotes" a person from [husb, wife] of the root's unions, not from
-  // the children: clicking the root's partner makes the partner the root.
-  knownBug("B03", "on the root's partner, does not re-root the chart", () => {
+  // Before T18 the reducer "promoted" a person from [husb, wife] of the root's unions at the
+  // cap: clicking the root's partner made the partner the root. T18 tests: test/show-children.test.ts.
+  it("[B03 fixed] on the root's partner, does not re-root the chart", () => {
     const g = family();
     const s0 = emptyState("R", { revealedUnions: new Map([["R", ["S"]]]) });
     const s1 = reduce(g, s0, { type: "SHOW_CHILDREN", personId: "S", atMaxDepth: true, currentDepth: 6 });
     expect(s1.rootId).toBe("R");
   });
 
-  knownBug("B03", "does not leave expandDownTopRow behind (nothing reads it)", () => {
+  it("[B03 fixed] does not leave expandDownTopRow behind (nothing reads it)", () => {
     const g = family();
     const s0 = emptyState("R", { revealedUnions: new Map([["R", ["S"]]]) });
     const s1 = reduce(g, s0, { type: "SHOW_CHILDREN", personId: "G", atMaxDepth: true, currentDepth: 6 });
-    expect(vs(s1).expandDownTopRow).toBeUndefined();
+    expect("expandDownTopRow" in vs(s1)).toBe(false);
   });
 
   it("below the cap, adds one generation and keeps the root", () => {
@@ -72,12 +72,12 @@ describe("B09: closing a partner", () => {
 });
 
 describe("B10: depth is clamped", () => {
-  knownBug("B10", "SET_CURRENT_DEPTH 0 becomes 1", () => {
+  it("[B10 fixed] SET_CURRENT_DEPTH 0 becomes 1", () => {
     const s1 = reduce(family(), emptyState("R"), { type: "SET_CURRENT_DEPTH", depth: 0 });
     expect(vs(s1).currentDepth).toBe(1);
   });
 
-  knownBug("B10", `SET_CURRENT_DEPTH 99 becomes the cap (${DEFAULT_MAX_DEPTH})`, () => {
+  it(`[B10 fixed] SET_CURRENT_DEPTH 99 becomes the cap (${DEFAULT_MAX_DEPTH})`, () => {
     const s1 = reduce(family(), emptyState("R"), { type: "SET_CURRENT_DEPTH", depth: 99 });
     expect(vs(s1).currentDepth).toBe(DEFAULT_MAX_DEPTH);
   });

@@ -35,4 +35,6 @@ export interface ViewStrategy {
   buildUnionNodes(personId: string, depth: number, ctx: BuildContext): UnionNode[];
   /** When true, do not render this person's descendants (collapse subtree). */
   isSubtreeCollapsed?(personId: string): boolean;
+  /** When true, a person at or past the depth cap still gets their children, one row more. */
+  showsChildrenPastCap?(personId: string): boolean;
 }

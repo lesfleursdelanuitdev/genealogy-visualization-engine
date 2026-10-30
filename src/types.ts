@@ -83,8 +83,11 @@ export interface ViewState {
   displayDepth?: number;
   /** Current depth (generations shown). Set by reducer (e.g. SHOW_CHILDREN Case 1); used for build and display. */
   currentDepth?: number;
-  /** When set, top row of tree should show these person IDs in this order (Case 2: preserve G_2 row). */
-  expandDownTopRow?: string[];
+  /**
+   * Descendancy: people at the depth cap whose children are shown anyway, one more row each
+   * ("Show children" at the cap, T18). Below the cap it has no effect.
+   */
+  showChildrenOf?: string[];
   /** When set, viewport should center on this person (used by history for "Pan to person" entries). */
   panToPersonId?: string;
   /** Person IDs whose subtrees are collapsed (descendants hidden). Stored as array for JSON-serializable state. */

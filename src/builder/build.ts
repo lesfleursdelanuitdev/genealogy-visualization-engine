@@ -40,6 +40,8 @@ export function buildTree(
   const people = graph.people;
   const visited = new Set<string>();
   const maxDepthRendered = { current: 0 };
+  /** True while a capped person's partner rows are built: their children are left out. */
+  let childrenCapped = false;
 
   const ctx = {
     graph,
@@ -51,7 +53,9 @@ export function buildTree(
     defaultChildrenOf: (personId: string) => graph.childrenOf(personId),
     maxDepthRendered,
     buildNode(personId: string, depth: number, onlyRoot = false): PersonNode | null {
-      if (depth > maxDepthRendered.current) maxDepthRendered.current = depth;
+      if (childrenCapped) return null;
+      // Rows added past the cap by "Show children" (T18) do not move the depth control.
+      if (depth > maxDepthRendered.current && depth <= maxDepth) maxDepthRendered.current = depth;
       if (visited.has(personId)) {
         const person = people.get(personId);
         if (!person) return null;
@@ -67,11 +71,26 @@ export function buildTree(
       }
 
       if (depth >= maxDepth) {
-        const hiddenCount = getHiddenCount?.(personId);
+        // At the cap a person keeps their revealed partner rows, but their children are built
+        // only when "Show children" asked for them (one more row, T18); otherwise +N.
+        const showChildren = strategy.showsChildrenPastCap?.(personId) === true;
+        const hiddenCount = showChildren ? undefined : getHiddenCount?.(personId);
         const atMaxPerson = { ...person, ...(hiddenCount != null && { _hiddenCount: hiddenCount }) };
-        const unionNodes = strategy.buildUnionNodes(personId, depth, ctx);
+        const wasCapped = childrenCapped;
+        childrenCapped = !showChildren;
+        let unionNodes;
+        try {
+          unionNodes = strategy.buildUnionNodes(personId, depth, ctx);
+        } finally {
+          childrenCapped = wasCapped;
+        }
         if (unionNodes.length > 0) return new PersonNode(atMaxPerson, unionNodes);
-        return new PersonNode(atMaxPerson);
+        if (!showChildren) return new PersonNode(atMaxPerson);
+        const children = graph
+          .childrenOf(personId)
+          .map((id) => this.buildNode(id, depth + 1))
+          .filter((n): n is PersonNode => n != null);
+        return new PersonNode(atMaxPerson, children);
       }
 
       const unionNodes = strategy.buildUnionNodes(personId, depth, ctx);

@@ -18,24 +18,27 @@ import type { GraphSnapshot } from "../../graph";
 import { shouldSkipCatchAllForFamilyUnit } from "../../reducer/strategies/descendancy/familyUnitScope";
 import type { BuildContext, ViewStrategy } from "../ViewStrategy";
 
-function resolveUnionBetweenPartners(
+/**
+ * The couple's families. A couple can have several FAM records (B04): all of them are shown,
+ * unless a family-unit scope names one.
+ */
+function unionsBetweenPartners(
   allUnions: readonly UnionRecord[],
   personId: string,
   spouseId: string,
   familyXref?: string | null
-): UnionRecord | undefined {
+): readonly UnionRecord[] {
   const matching = allUnions.filter(
     (u) =>
       (u.husb === personId && u.wife === spouseId) ||
       (u.husb === spouseId && u.wife === personId)
   );
-  if (matching.length === 0) return undefined;
   const fam = familyXref?.trim();
   if (fam) {
     const byFamily = matching.find((u) => u.id === fam);
-    if (byFamily) return byFamily;
+    if (byFamily) return [byFamily];
   }
-  return matching[0];
+  return matching;
 }
 
 export class DescendancyViewStrategy implements ViewStrategy {
@@ -47,6 +50,10 @@ export class DescendancyViewStrategy implements ViewStrategy {
   isSubtreeCollapsed(personId: string): boolean {
     const list = this.viewState.collapsedSubtrees ?? [];
     return list.includes(personId);
+  }
+
+  showsChildrenPastCap(personId: string): boolean {
+    return this.viewState.showChildrenOf?.includes(personId) ?? false;
   }
 
   buildUnionNodes(personId: string, depth: number, ctx: BuildContext): UnionNode[] {
@@ -73,18 +80,19 @@ export class DescendancyViewStrategy implements ViewStrategy {
         familyScope?.personId === personId && familyScope.spouseId === spouseId
           ? familyScope.familyXref
           : null;
-      const union = resolveUnionBetweenPartners(allUnions, personId, spouseId, scopedFamilyXref);
-      if (!union) return [];
-      const rightPerson = people.get(spouseId) ?? null;
-      const rightNode = rightPerson ? new PersonNode({ ...rightPerson, _onlyRoot: false }) : null;
+      const unions = unionsBetweenPartners(allUnions, personId, spouseId, scopedFamilyXref);
       const basePerson = people.get(personId);
-      if (!basePerson) return [];
-      const leftNode = new PersonNode({ ...basePerson, _onlyRoot: false });
-      const childNodes = union.children
-        .map((c) => ctx.buildNode(c.id, depth + 1))
-        .filter((n): n is PersonNode => n != null);
-      const unionNode = new NormalUnionNode(leftNode, rightNode, childNodes, personId);
-      return [unionNode, ...this.buildLinkedUnionNodes(spouseId, people, linkedUnions)];
+      if (unions.length === 0 || !basePerson) return [];
+      const rightPerson = people.get(spouseId) ?? null;
+      const unionNodes = unions.map((union) => {
+        const leftNode = new PersonNode({ ...basePerson, _onlyRoot: false });
+        const rightNode = rightPerson ? new PersonNode({ ...rightPerson, _onlyRoot: false }) : null;
+        const childNodes = union.children
+          .map((c) => ctx.buildNode(c.id, depth + 1))
+          .filter((n): n is PersonNode => n != null);
+        return new NormalUnionNode(leftNode, rightNode, childNodes, personId);
+      });
+      return [...unionNodes, ...this.buildLinkedUnionNodes(spouseId, people, linkedUnions)];
     });
 
     const revealedUnionIds = new Set(

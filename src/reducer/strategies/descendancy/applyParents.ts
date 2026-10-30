@@ -63,7 +63,6 @@ function applyParentsAsRoot(
     linkedUnions: nextLinked,
     displayDepth: undefined,
     currentDepth: undefined,
-    expandDownTopRow: undefined,
   };
   const p = people.get(primaryParent);
   const newRootFullName =
@@ -155,7 +154,6 @@ function applyParentsInTree(
     linkedUnions: nextLinked,
     displayDepth: undefined,
     currentDepth: undefined,
-    expandDownTopRow: undefined,
   };
   const hist = pushHistory(state, state.rootId, newViewState, "Show parents");
   return { ...state, viewState: newViewState, ...hist };

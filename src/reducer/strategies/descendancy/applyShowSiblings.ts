@@ -25,7 +25,6 @@ export function applyShowSiblings(state: TreeState, personId: string, graph: Gra
     linkedUnions: new Map(),
     displayDepth: undefined,
     currentDepth: undefined,
-    expandDownTopRow: undefined,
     siblingView: {
       personId,
       spouseCatchAlls: [],
