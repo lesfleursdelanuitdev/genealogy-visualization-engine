@@ -45,14 +45,14 @@ describe("H4: unknown partners", () => {
       unions: [union("@F1@", "", "M1", ["C1"]), union("@F2@", "", "M2", ["C2"])],
     });
 
-  knownBug("H4", "gives each family its own unknown partner, not one shared person", () => {
+  it("[H4 fixed] gives each family its own unknown partner, not one shared person", () => {
     const graph = g();
     const [m1Partner] = spousesOf(graph, "M1");
     const [m2Partner] = spousesOf(graph, "M2");
     expect(m1Partner.spouseId).not.toBe(m2Partner.spouseId);
   });
 
-  knownBug("H4", "the unknown partner of one family has no other families", () => {
+  it("[H4 fixed] the unknown partner of one family has no other families", () => {
     const graph = g();
     const [m1Partner] = spousesOf(graph, "M1");
     expect(spousesOf(graph, m1Partner.spouseId)).toHaveLength(1);

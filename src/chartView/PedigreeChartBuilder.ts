@@ -82,8 +82,13 @@ export class PedigreeChartBuilder implements ChartViewBuildAdapter {
         return new PersonNode({ ...raw, _onlyRoot: gen === 0 }, []);
       }
 
-      const h = (u.husb ?? "").trim();
-      const w = (u.wife ?? "").trim();
+      // A per-family placeholder partner (H4) counts as a missing parent here.
+      const known = (id: string | undefined) => {
+        const t = (id ?? "").trim();
+        return t && people.get(t)?._unknownPlaceholder !== true ? t : "";
+      };
+      const h = known(u.husb);
+      const w = known(u.wife);
 
       if (!h && !w) {
         return new PersonNode({ ...raw, _onlyRoot: gen === 0 }, []);

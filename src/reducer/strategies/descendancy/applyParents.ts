@@ -26,13 +26,10 @@ function applyParentsAsRoot(
   parentUnions: readonly UnionRecord[],
   graph: GraphSnapshot
 ): TreeState {
-  const birthUnion =
-    parentUnions.find(
-      (u) => u.children.find((c) => c.id === personId)?.pedi === "birth"
-    ) ?? parentUnions[0];
+  const birthUnion = graph.birthUnionByChild.get(personId) ?? parentUnions[0];
 
   const people = graph.people;
-  const isHusbUnknown = people.get(birthUnion.husb)?.firstName === "Unknown";
+  const isHusbUnknown = people.get(birthUnion.husb)?._unknownPlaceholder === true;
   const primaryParent = isHusbUnknown ? birthUnion.wife : birthUnion.husb;
   const otherParent = isHusbUnknown ? birthUnion.husb : birthUnion.wife;
 

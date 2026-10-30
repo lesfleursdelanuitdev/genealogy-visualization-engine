@@ -11,9 +11,7 @@ export function applyShowSiblings(state: TreeState, personId: string, graph: Gra
   const parentUnions = graph.parentUnionsOf(personId);
   if (parentUnions.length === 0) return state;
 
-  const birthUnion =
-    parentUnions.find((u) => u.children.find((c) => c.id === personId)?.pedi === "birth") ??
-    parentUnions[0];
+  const birthUnion = graph.birthUnionByChild.get(personId) ?? parentUnions[0];
 
   const newRoot = birthUnion.husb;
   const otherParent = birthUnion.wife;

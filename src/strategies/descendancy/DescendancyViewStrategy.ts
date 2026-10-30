@@ -158,10 +158,8 @@ export class DescendancyViewStrategy implements ViewStrategy {
     const people = graph.people;
     const parentUnions = graph.parentUnionsOf(anchorId);
     if (parentUnions.length === 0) return null;
-    const birthUnion =
-      parentUnions.find((u) => u.children.find((c) => c.id === anchorId)?.pedi === "birth") ??
-      parentUnions[0];
-    const isHusbUnknown = people.get(birthUnion.husb)?.firstName === "Unknown";
+    const birthUnion = graph.birthUnionByChild.get(anchorId) ?? parentUnions[0];
+    const isHusbUnknown = people.get(birthUnion.husb)?._unknownPlaceholder === true;
     return isHusbUnknown ? birthUnion.wife : birthUnion.husb;
   }
 
