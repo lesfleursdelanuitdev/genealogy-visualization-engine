@@ -79,29 +79,30 @@ These are GEDCOM concepts (xrefs, `HUSB`/`WIFE`/`CHIL`, `PEDI`), but the engine 
 
 ## Install
 
-The package is not published to npm (`"private": true`). It ships TypeScript source; `main` and `exports` point at `src/index.ts`, so your bundler compiles it.
+The package is not published to npm (`"private": true`). `npm run build` writes ESM and `.d.ts` files to `dist/`; `main`, `types` and `exports` point there. The emitted imports have no file extensions, so `dist/` is meant for bundlers (Vite, Next, webpack, vitest), not bare Node ESM.
 
-Clone it next to your app and depend on it by path:
+From a GitHub tag (the `prepare` script builds `dist/` on install):
 
 ```json
 {
   "dependencies": {
-    "@ligneous/visualization-engine": "file:../genealogy-visualization-engine"
+    "@ligneous/visualization-engine": "github:lesfleursdelanuitdev/genealogy-visualization-engine#v0.1.0"
   }
 }
 ```
 
-In Next.js, add it to `transpilePackages`. Peer dependencies: `react` 19 and `@tanstack/react-query` 5 (declared, though the current source does not import React Query).
+Peer dependencies: `react` 19 (for the hooks) and `@tanstack/react-query` 5 (declared, though the current source does not import it).
 
 ## Usage
 
-Build and lay out a descendancy chart from your own data:
+Build the graph once per file, then make a chart session for each chart and view state:
 
 ```ts
 import {
-  FamilyTreeBuilder,
-  DescendancyChartAdapter,
-  setCurrentBuilder,
+  createGraphSnapshot,
+  createChartSession,
+  createTreeReducer,
+  createInitialState,
   type DescendancyPerson,
   type UnionRecord,
 } from "@ligneous/visualization-engine";
@@ -115,51 +116,56 @@ const unions: UnionRecord[] = [
   { id: "@F1@", husb: "@I2@", wife: "@I1@", children: [{ id: "@I3@", pedi: "birth" }] },
 ];
 
-const builder = new FamilyTreeBuilder({ people, unions });
-setCurrentBuilder(builder); // the build step still reads this global; see "Known limits"
+const graph = createGraphSnapshot({ people, unions }); // indexes built once
 
-const adapter = new DescendancyChartAdapter(builder);
-const { root } = adapter.buildTreeResult("@I2@", {}, 4);
+const session = createChartSession({
+  graph,
+  viewState: { revealedUnions: new Map([["@I2@", ["@I1@"]]]) },
+  options: { strategy: "descendancy", maxDepth: 4 },
+});
+const { root, bounds, baseX, baseY } = session.buildChart("@I2@");
+// Draw at translate(baseX + pan.x, baseY + pan.y) scale(scale): walk root.children for
+// person cards and union diamonds, and use session.descriptor.connectors for the lines.
 
-const descriptor = adapter.getDescriptor();
-descriptor.layout(root);                  // sets x / y on every node
-const bounds = descriptor.getBounds(root); // { minX, maxX, maxY }
-// Walk `root.children` and draw person cards, union diamonds and
-// connectors (descriptor.connectors) in SVG.
+// Interaction state: a reducer bound to the same graph (works with React's useReducer).
+const reduce = createTreeReducer(graph);
+const next = reduce(createInitialState("descendancy", "@I2@"), { type: "REVEAL_ALL_SPOUSES" });
 ```
 
-Swap `DescendancyChartAdapter` for `PedigreeChartBuilder`, `VerticalPedigreeChartBuilder` or `FanChartBuilder` to get the other chart types. In a React app, `useChartViewFetch(strategyName, rootId, depth)` does the fetch, mapping and adapter setup for you, but it expects the `/api/tree/*` routes described above.
+`strategy` can also be `"pedigree"`, `"vertical_pedigree"` or `"fan_chart"`. Sessions hold no shared state, so a page chart and a modal chart can build side by side. They are cheap; make a new one when the view state changes and keep reusing the snapshot.
+
+In a React app, `useChartViewFetch(strategyName, rootId, depth)` still fetches the Gonsalves `/api/tree/*` routes and returns `{ chartAdapter, graph, … }`; making fetching pluggable is the next step of the refactor plan (phase 4).
 
 ## API summary
 
 | Area | Main exports |
 | --- | --- |
-| Data in | `FamilyTreeBuilder`, `DescendancyPerson`, `UnionRecord`, `ViewState` |
-| Chart adapters | `DescendancyChartAdapter`, `PedigreeChartBuilder`, `VerticalPedigreeChartBuilder`, `FanChartBuilder`, `CHART_VIEW_STRATEGIES` |
+| Data in | `createGraphSnapshot`, `GraphSnapshot`, `GraphInput`, `DescendancyPerson`, `UnionRecord`, `ViewState` |
+| Charts | `createChartSession`, `ChartSession`, `ChartLayout`, `layoutChart`, `buildTree`, `CHART_VIEW_STRATEGIES` |
 | Layout | `layout`, `getBounds`, `computeFitToViewport`, `defaultConnectors`, size constants (`PERSON_WIDTH`, `PERSON_HEIGHT`, `GAP`, ...) |
 | Fan chart geometry | `buildFanGeometry`, `buildAnnularSectorPath`, `buildTextArcPath`, `polarToCartesian`, `computeAvatarPlacement`, `FAN_CHART_DEFAULTS` |
-| Node model | `PersonNode`, `UnionNode`, `NormalUnionNode`, `CatchAllNode`, `LinkedParentNode`, `SiblingAdoptiveUnionNode`, `FamilyTreeNodeFactory` |
-| State | `treeReducer`, `createInitialState`, `TreeState`, `TreeAction`, `HistoryEntry` |
+| Node model | `PersonNode`, `UnionNode`, `NormalUnionNode`, `CatchAllNode`, `LinkedParentNode`, `SiblingAdoptiveUnionNode` |
+| State | `treeReducer(state, action, graph)`, `createTreeReducer(graph)`, `createInitialState`, `TreeState`, `TreeAction`, `HistoryEntry` |
 | React hooks | `useChartViewFetch`, `useTreeBuild`, `usePanZoom`, `usePanToPerson`, `useChartSearch`, `useDepth`, `useSpouseDrawer`, `usePanelVisibility` |
-| Helpers | `handlePersonCardAction`, `buildLegendItems`, `countVisibleNodes`, `serializeNode` |
+| Helpers | `handlePersonCardAction`, `buildLegendItems`, `countVisibleNodes`, `countDescendants` |
 
-Everything is exported from `src/index.ts`. Subpaths are also importable (`@ligneous/visualization-engine/strategies/...`).
+Everything is exported from the package root.
 
 ## Build and test
 
-`package.json` has no scripts and the repo has no test suite yet. To type-check (after installing the dev dependencies):
-
 ```sh
-npx tsc --noEmit
+npm install
+npm run typecheck   # tsc --noEmit over src/ and test/
+npm test            # vitest run
+npm run build       # dist/: ESM + .d.ts
+npm run check       # all three
 ```
 
-Next step: add a test runner and tests for the layout functions.
+`test/app/` holds the 74 engine tests copied from the Gonsalves app. `test/bugs/` holds repros for the 2026-10-17 audit's bugs: each is an `it.fails` (through `knownBug()`) until its fix lands. `BUGS_STRICT=1 npx vitest run test/bugs` shows their real failures. `test/fixtures/smith` is a small fictional family for tests and demos.
 
 ## Known limits
 
-`REFACTOR_PLAN.md` describes the work in progress. In short: `buildTree` reads people and unions through a module-level "current builder" (`setCurrentBuilder`), and the descendancy strategy still imports a few lookups from `src/testdata`. The plan is to pass an explicit graph snapshot instead. `useChartViewFetch` also hard-codes the `/api/tree/*` routes.
-
-`src/testdata` holds a small fictional family ("Smith") for demos.
+`REFACTOR_PLAN.md` describes the work in progress. Phases 1–3 are done: the engine reads only the `GraphSnapshot` it is given, and there is no global builder. Still to do: `useChartViewFetch` hard-codes the Gonsalves `/api/tree/*` routes (phase 4), the default root is a Gonsalves person, and the bugs in `test/bugs/` are open. Progress: `docs/v0.1.0-progress.md`.
 
 ## Stack
 

@@ -1,6 +1,10 @@
 /**
- * Descendancy chart model: constants, types, and dumb node classes.
- * Layout algorithm and React rendering live elsewhere.
+ * @ligneous/visualization-engine: headless layout for family-tree charts.
+ *
+ * Input: a GraphSnapshot built once from { people, unions } (createGraphSnapshot).
+ * Entry point: createChartSession({ graph, viewState, options }) → buildTree / buildChart.
+ * State: treeReducer(state, action, graph) or createTreeReducer(graph).
+ * Rendering lives in the app (or @ligneous/visualization-react).
  */
 
 export { MAX_HISTORY, DEFAULT_MAX_DEPTH, DEFAULT_PEDIGREE_DEPTH, DEFAULT_ROOT_XREF } from "./constants";
@@ -24,8 +28,17 @@ export type {
   StrategyConstants,
   LayoutBoundsOptions,
 } from "./strategies/ViewStrategyDescriptor";
-export { FamilyTreeBuilder, buildTree, setCurrentBuilder, clearCurrentBuilder } from "./builder";
-export type { FamilyTreeBuildOptions, FamilyTreeBuilderInput, BuildTreeOptions } from "./builder";
+export { buildTree } from "./builder";
+export type { BuildTreeOptions, BuildTreeResult } from "./builder";
+export {
+  createChartSession,
+  layoutChart,
+  isGraphSnapshot,
+  type ChartSession,
+  type ChartSessionInit,
+  type ChartSessionOptions,
+  type ChartLayout,
+} from "./session";
 export { defaultConnectors } from "./strategies/descendancy";
 export {
   hasIncomingConnector,
@@ -54,11 +67,9 @@ export {
   CatchAllNode,
   LinkedParentNode,
   SiblingAdoptiveUnionNode,
-  FamilyTreeNodeFactory,
   type ChartNode,
   type NodeType,
   type IUnionNode,
-  type FamilyTreeNodeFactoryConfig,
 } from "./nodes";
 
 export { visualHalfWidth, getBounds } from "./strategies/descendancy/bounds";
@@ -67,29 +78,17 @@ export { collectAll, collectAllPersonNodes, getMaxDepth, findUnionContainingPers
 export { layout, markUnions, isContainer } from "./strategies/descendancy";
 export { DEFAULT_PEDIGREE_PARENT_PAIR_GAP, DEFAULT_PEDIGREE_GENERATION_GAP } from "./strategies/pedigree/pedigreeLayout";
 
-export { buildView, countDescendants } from "./strategies/descendancy";
+export { countDescendants } from "./strategies/descendancy";
 export type { ViewStrategy, BuildContext } from "./strategies/ViewStrategy";
-export { DescendancyViewStrategy, PedigreeViewStrategy } from "./strategies";
+export { DescendancyViewStrategy } from "./strategies";
 
 export type { ViewState, UnionRecord, UnionChild, LinkedUnionEntry, SiblingView } from "./types";
 
-// Global "current builder" getters. Removed with the global builder (refactor phase 3).
-export {
-  getPeople,
-  getSpousesOf,
-  getUnions,
-  getUnionsByPerson,
-  getAllChildrenOf,
-  getParentUnionsByChild,
-  getUnionById,
-  getBirthUnionByChild,
-} from "./builder";
-
 export {
   treeReducer,
+  createTreeReducer,
   INITIAL_STATE,
   createInitialState,
-  getAllActionTypes,
   isAllSpousesRevealed,
   type TreeState,
   type TreeAction,
@@ -100,7 +99,6 @@ export {
   handlePersonCardAction,
   buildLegendItems,
   countVisibleNodes,
-  serializeNode,
   computeFitToViewport,
   type PersonCardAction,
   type HandlePersonCardActionContext,
@@ -109,14 +107,7 @@ export {
 } from "./helpers";
 
 export type { ChartViewStrategyName, ChartViewBuildAdapter } from "./chartView";
-export {
-  CHART_VIEW_STRATEGIES,
-  isChartViewStrategyName,
-  DescendancyChartAdapter,
-  PedigreeChartBuilder,
-  VerticalPedigreeChartBuilder,
-  FanChartBuilder,
-} from "./chartView";
+export { CHART_VIEW_STRATEGIES, isChartViewStrategyName } from "./chartView";
 
 export {
   bandThicknessForGeneration,
@@ -152,7 +143,6 @@ export {
 
 export {
   useChartSearch,
-  useDescendancyFetch,
   useChartViewFetch,
   type UseChartViewFetchResult,
   useDepth,

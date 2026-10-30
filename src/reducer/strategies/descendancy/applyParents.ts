@@ -1,4 +1,4 @@
-import { getUnionsByPerson, getParentUnionsByChild, getPeople } from "../../../builder/currentBuilder";
+import type { GraphSnapshot } from "../../../graph";
 import type { UnionRecord, ViewState } from "../../../types";
 import type { TreeState } from "../../types";
 import { pushHistory } from "../../pushHistory";
@@ -7,13 +7,12 @@ function viewState(state: TreeState): ViewState {
   return state.viewState as ViewState;
 }
 
-function getTreeDescendants(rootId: string): Set<string> {
+function getTreeDescendants(graph: GraphSnapshot, rootId: string): Set<string> {
   const vis = new Set<string>();
   function walk(id: string) {
     if (vis.has(id)) return;
     vis.add(id);
-    const unions = getUnionsByPerson().get(id) ?? [];
-    for (const u of unions) {
+    for (const u of graph.unionsOf(id)) {
       for (const c of u.children) walk(c.id);
     }
   }
@@ -24,14 +23,15 @@ function getTreeDescendants(rootId: string): Set<string> {
 function applyParentsAsRoot(
   state: TreeState,
   personId: string,
-  parentUnions: UnionRecord[]
+  parentUnions: readonly UnionRecord[],
+  graph: GraphSnapshot
 ): TreeState {
   const birthUnion =
     parentUnions.find(
       (u) => u.children.find((c) => c.id === personId)?.pedi === "birth"
     ) ?? parentUnions[0];
 
-  const people = getPeople();
+  const people = graph.people;
   const isHusbUnknown = people.get(birthUnion.husb)?.firstName === "Unknown";
   const primaryParent = isHusbUnknown ? birthUnion.wife : birthUnion.husb;
   const otherParent = isHusbUnknown ? birthUnion.husb : birthUnion.wife;
@@ -93,9 +93,10 @@ function applyParentsAsRoot(
 function applyParentsInTree(
   state: TreeState,
   personId: string,
-  parentUnions: UnionRecord[]
+  parentUnions: readonly UnionRecord[],
+  graph: GraphSnapshot
 ): TreeState {
-  const treeNodes = getTreeDescendants(state.rootId);
+  const treeNodes = getTreeDescendants(graph, state.rootId);
 
   const anchorUnions = parentUnions.filter(
     (u) => treeNodes.has(u.husb) || treeNodes.has(u.wife)
@@ -165,13 +166,14 @@ function applyParentsInTree(
 
 export function applyParents(
   state: TreeState,
-  personId: string
+  personId: string,
+  graph: GraphSnapshot
 ): TreeState {
-  const parentUnions = getParentUnionsByChild().get(personId) ?? [];
+  const parentUnions = graph.parentUnionsOf(personId);
   if (parentUnions.length === 0) return state;
 
   if (personId === state.rootId) {
-    return applyParentsAsRoot(state, personId, parentUnions);
+    return applyParentsAsRoot(state, personId, parentUnions, graph);
   }
-  return applyParentsInTree(state, personId, parentUnions);
+  return applyParentsInTree(state, personId, parentUnions, graph);
 }

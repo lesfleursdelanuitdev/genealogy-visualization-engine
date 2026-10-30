@@ -5,3 +5,4 @@ export { DescendancyChartAdapter } from "./DescendancyChartAdapter";
 export { PedigreeChartBuilder } from "./PedigreeChartBuilder";
 export { VerticalPedigreeChartBuilder } from "./VerticalPedigreeChartBuilder";
 export { FanChartBuilder } from "./FanChartBuilder";
+export { createChartAdapter } from "./createChartAdapter";

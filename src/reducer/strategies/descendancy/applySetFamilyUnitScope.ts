@@ -3,6 +3,7 @@ import type { ViewState } from "../../../types";
 import { pushHistory } from "../../pushHistory";
 import { getPersonDisplay } from "../../getPersonDisplay";
 import { normalizeFamilyUnitScope } from "./familyUnitScope";
+import type { GraphSnapshot } from "../../../graph";
 
 function vs(s: TreeState): ViewState {
   return s.viewState as ViewState;
@@ -12,7 +13,8 @@ export function applySetFamilyUnitScope(
   state: TreeState,
   personId: string,
   spouseId: string,
-  familyXref?: string | null
+  familyXref: string | null | undefined,
+  graph: GraphSnapshot
 ): TreeState {
   const v = vs(state);
   const scope = normalizeFamilyUnitScope(personId, spouseId, familyXref);
@@ -23,8 +25,8 @@ export function applySetFamilyUnitScope(
     revealedUnions: nextRevealed,
     familyUnitScope: scope,
   };
-  const { fullName, initials } = getPersonDisplay(scope.personId);
-  const spouseDisplay = getPersonDisplay(scope.spouseId);
+  const { fullName, initials } = getPersonDisplay(graph, scope.personId);
+  const spouseDisplay = getPersonDisplay(graph, scope.spouseId);
   const hist = pushHistory(
     state,
     state.rootId,

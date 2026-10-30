@@ -11,14 +11,3 @@ export { NormalUnionNode } from "./NormalUnionNode";
 export { CatchAllNode } from "./CatchAllNode";
 export { LinkedParentNode } from "./LinkedParentNode";
 export { SiblingAdoptiveUnionNode } from "./SiblingAdoptiveUnionNode";
-export { FamilyTreeNodeFactory } from "./FamilyTreeNodeFactory";
-export type {
-  FamilyTreeNodeFactoryConfig,
-  NodeLayout,
-  PersonNodeOptions,
-  PersonDescriptor,
-  UnionNodeType,
-  UnionNodeOptions,
-  UnionNodeCreateData,
-  UnionDescriptor,
-} from "./FamilyTreeNodeFactory";

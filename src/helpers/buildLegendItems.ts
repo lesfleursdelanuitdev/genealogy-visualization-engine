@@ -1,14 +1,15 @@
-import { getPeople, getUnionById } from "../builder/currentBuilder";
+import type { GraphSnapshot } from "../graph";
 import { DEFAULT_TREE_CONNECTOR_FALLBACK_HEX, SIBLING_COLORS } from "../strategies/descendancy/constants";
 import type { ViewState, SiblingView } from "../types";
 
 export function buildLegendItems(
+  graph: GraphSnapshot,
   siblingView: SiblingView | null | undefined,
   rootId: string,
   viewState: ViewState
 ): { label: string; color: string }[] {
   if (!siblingView) return [];
-  const people = getPeople();
+  const people = graph.people;
   const sibPerson = people.get(siblingView.personId);
   const bioFatherXref = siblingView.birthFatherPersonId?.trim();
   const bioMotherXref = siblingView.birthMotherPersonId?.trim();
@@ -47,7 +48,7 @@ export function buildLegendItems(
     );
   }
   for (const unionId of siblingView.adoptiveUnions ?? []) {
-    const u = getUnionById().get(unionId);
+    const u = graph.unionById.get(unionId);
     if (!u || !sibPerson) continue;
     const W = people.get(u.husb);
     const V = people.get(u.wife);

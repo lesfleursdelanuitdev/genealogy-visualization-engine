@@ -1,13 +1,8 @@
 /**
- * Descendancy build facade and helpers: buildView, countDescendants.
- * Uses the generic buildTree from chart root with descendancy strategy and +N badge at max depth.
+ * Descendancy "+N hidden descendants" counts, used by the descendancy descriptor at the depth limit.
  */
 
-import { DEFAULT_MAX_DEPTH } from "../../constants";
-import type { ViewState } from "../../types";
 import type { GraphSnapshot } from "../../graph";
-import { buildTree, type BuildTreeResult } from "../../builder/build";
-import { DescendancyViewStrategy } from "./DescendancyViewStrategy";
 
 /**
  * Memoised counts, one cache per snapshot. A snapshot never changes, so the cache lives
@@ -39,23 +34,4 @@ export function countDescendants(
   const count = childIds.reduce((sum, id) => sum + 1 + countDescendants(graph, id, visited), 0);
   cache.set(personId, count);
   return count;
-}
-
-/**
- * Build descendancy chart: (graph, rootId, viewState, maxDepth) → { root, maxDepthRendered }.
- * Uses generic buildTree with DescendancyViewStrategy and countDescendants for +N at max depth.
- */
-export function buildView(
-  graph: GraphSnapshot,
-  rootId: string,
-  viewState: ViewState = {},
-  maxDepth: number = DEFAULT_MAX_DEPTH
-): BuildTreeResult {
-  const effectiveDepth = viewState.currentDepth ?? viewState.displayDepth ?? maxDepth;
-  const strategy = new DescendancyViewStrategy(viewState, effectiveDepth);
-  return buildTree(rootId, strategy, {
-    graph,
-    maxDepth: effectiveDepth,
-    getHiddenCount: (personId) => countDescendants(graph, personId),
-  });
 }

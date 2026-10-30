@@ -1,4 +1,4 @@
-import { getParentUnionsByChild, getPeople } from "../../../builder/currentBuilder";
+import type { GraphSnapshot } from "../../../graph";
 import type { TreeState } from "../../types";
 import type { ViewState } from "../../../types";
 import { pushHistory } from "../../pushHistory";
@@ -7,8 +7,8 @@ import { pushHistory } from "../../pushHistory";
  * Sets root and minimal siblingView (personId + placeholder arrays).
  * Catch-alls are filled when the sibling-view API response arrives (SET_SIBLING_VIEW_FROM_API).
  */
-export function applyShowSiblings(state: TreeState, personId: string): TreeState {
-  const parentUnions = getParentUnionsByChild().get(personId) ?? [];
+export function applyShowSiblings(state: TreeState, personId: string, graph: GraphSnapshot): TreeState {
+  const parentUnions = graph.parentUnionsOf(personId);
   if (parentUnions.length === 0) return state;
 
   const birthUnion =
@@ -36,7 +36,7 @@ export function applyShowSiblings(state: TreeState, personId: string): TreeState
     },
   };
 
-  const people = getPeople();
+  const people = graph.people;
   const personForLabel = people.get(personId);
   const personFullName =
     (personForLabel

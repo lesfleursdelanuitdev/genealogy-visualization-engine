@@ -1,5 +1,6 @@
 import type { TreeAction } from "../reducer";
 import type { ViewState } from "../types";
+import type { GraphSnapshot } from "../graph";
 
 export type PersonCardAction =
   | "showSpouses"
@@ -21,6 +22,8 @@ export type PersonCardAction =
   | "pedigreeReroot";
 
 export interface HandlePersonCardActionContext {
+  /** The chart's people and unions (for the root's display name). */
+  graph: GraphSnapshot;
   dispatch: (action: TreeAction) => void;
   setDrawerPersonId: (id: string | null) => void;
   setPan: (pan: { x: number; y: number }) => void;

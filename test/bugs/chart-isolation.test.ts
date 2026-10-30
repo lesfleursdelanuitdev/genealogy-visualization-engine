@@ -1,19 +1,17 @@
 /**
- * H1: one global builder is shared by every chart.
+ * H1: one global builder was shared by every chart (fixed in refactor phases 1 and 3).
  *
- * Reproduces what the Gonsalves profile page does: the profile chart loads its graph, then a
- * modal opens a second chart with another graph. Each chart has its own adapter, but the
- * build reads the people through the module-level "current builder", which now holds the
- * modal's graph.
+ * The Gonsalves profile page loads its chart, then a modal opens a second chart with another
+ * graph. Before, each chart had its own adapter but the build and the reducer read people
+ * through a module-level "current builder", which then held the modal's graph. Now each chart
+ * session and each bound reducer reads only its own graph.
  */
 import { describe, it, expect } from "vitest";
-import { knownBug } from "../helpers/bugs";
 import { person, union } from "../helpers/graph";
 import {
-  FamilyTreeBuilder,
-  DescendancyChartAdapter,
-  setCurrentBuilder,
-  treeReducer,
+  createChartSession,
+  createGraphSnapshot,
+  createTreeReducer,
   PersonNode,
   UnionNode,
   type TreeState,
@@ -29,21 +27,17 @@ const modalGraph = {
   unions: [union("@FB@", "@B1@", "@B2@", [])],
 };
 
-describe("H1: charts share one global builder", () => {
-  // Builds were fixed by the GraphSnapshot refactor: an adapter builds from its own snapshot.
-  it("[H1 fixed for builds] a second chart loading does not change what the first chart builds", () => {
-    const profileData = new FamilyTreeBuilder(profileGraph);
-    setCurrentBuilder(profileData); // what useChartViewFetch does when the profile chart loads
-    const profileChart = new DescendancyChartAdapter(profileData);
+describe("H1: charts no longer share one global builder", () => {
+  it("[H1 fixed] a second chart loading does not change what the first chart builds", () => {
+    const profileChart = createChartSession({
+      graph: profileGraph,
+      viewState: { revealedUnions: new Map([["@A1@", ["@A2@"]]]) },
+      options: { maxDepth: 4 },
+    });
+    const modalChart = createChartSession({ graph: modalGraph }); // the modal chart loads
+    modalChart.buildChart("@B1@");
 
-    const modalData = new FamilyTreeBuilder(modalGraph);
-    setCurrentBuilder(modalData); // the modal chart loads
-
-    const { root } = profileChart.buildTreeResult(
-      "@A1@",
-      { revealedUnions: new Map([["@A1@", ["@A2@"]]]) },
-      4
-    );
+    const { root } = profileChart.buildChart("@A1@");
     expect(root).toBeInstanceOf(PersonNode);
     expect((root as PersonNode).content.firstName).toBe("Alice");
     const unionNode = root.children[0];
@@ -51,9 +45,8 @@ describe("H1: charts share one global builder", () => {
     expect((unionNode as UnionNode).children.map((c) => (c as PersonNode).content.id)).toEqual(["@A3@"]);
   });
 
-  knownBug("H1", "a second chart loading does not change what the first chart's reducer sees", () => {
-    const profileData = new FamilyTreeBuilder(profileGraph);
-    setCurrentBuilder(profileData);
+  it("[H1 fixed] a second chart loading does not change what the first chart's reducer sees", () => {
+    const profileReducer = createTreeReducer(createGraphSnapshot(profileGraph));
     const state: TreeState = {
       strategyName: "descendancy",
       rootId: "@A1@",
@@ -62,9 +55,9 @@ describe("H1: charts share one global builder", () => {
       historyIndex: 0,
     };
 
-    setCurrentBuilder(new FamilyTreeBuilder(modalGraph)); // the modal chart loads
+    createTreeReducer(createGraphSnapshot(modalGraph)); // the modal chart loads
 
-    const next = treeReducer(state, { type: "REVEAL_ALL_SPOUSES" });
+    const next = profileReducer(state, { type: "REVEAL_ALL_SPOUSES" });
     expect((next.viewState as ViewState).revealedUnions?.get("@A1@")).toEqual(["@A2@"]);
   });
 });

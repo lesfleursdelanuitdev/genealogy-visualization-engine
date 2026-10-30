@@ -5,11 +5,9 @@
  * changes (GraphSnapshot, chart sessions) only this file changes, not the repros.
  */
 import {
-  FamilyTreeBuilder,
-  setCurrentBuilder,
+  createGraphSnapshot,
+  createChartSession,
   countDescendants,
-  DescendancyChartAdapter,
-  PedigreeChartBuilder,
   treeReducer,
   PersonNode,
   UnionNode,
@@ -20,8 +18,9 @@ import {
   type TreeState,
   type TreeAction,
   type ChartViewBuildAdapter,
+  type GraphSnapshot,
+  type BuildTreeResult,
 } from "../../src";
-import type { BuildTreeResult } from "../../src/builder";
 
 export interface GraphFixture {
   people: DescendancyPerson[];
@@ -29,7 +28,7 @@ export interface GraphFixture {
 }
 
 /** Opaque handle to a loaded graph; what it is depends on the engine API under test. */
-export type Graph = FamilyTreeBuilder;
+export type Graph = GraphSnapshot;
 
 export function person(
   id: string,
@@ -55,7 +54,7 @@ export function union(
 }
 
 export function graphOf(fixture: GraphFixture): Graph {
-  return new FamilyTreeBuilder(fixture);
+  return createGraphSnapshot(fixture);
 }
 
 export function buildDescendancy(
@@ -64,8 +63,7 @@ export function buildDescendancy(
   viewState: ViewState = {},
   maxDepth = 6
 ): BuildTreeResult {
-  setCurrentBuilder(g);
-  return new DescendancyChartAdapter(g).buildTreeResult(rootId, viewState, maxDepth);
+  return createChartSession({ graph: g, viewState, options: { strategy: "descendancy", maxDepth } }).buildTree(rootId);
 }
 
 export function buildPedigree(
@@ -74,27 +72,25 @@ export function buildPedigree(
   viewState: ViewState = {},
   depth = 4
 ): BuildTreeResult {
-  setCurrentBuilder(g);
-  return new PedigreeChartBuilder(g).buildTreeResult(rootId, viewState, depth);
+  return createChartSession({ graph: g, viewState, options: { strategy: "pedigree", maxDepth: depth } }).buildTree(rootId);
 }
 
 /** Run one reducer action with `g` as the chart's graph. */
 export function reduce(g: Graph, state: TreeState, action: TreeAction): TreeState {
-  setCurrentBuilder(g);
-  return treeReducer(state, action);
+  return treeReducer(state, action, g);
 }
 
 /** "+N hidden descendants" counter as one chart build sees it (one cache for all calls). */
 export function hiddenCounter(g: Graph): (personId: string) => number {
-  return (personId) => countDescendants(g.snapshot, personId);
+  return (personId) => countDescendants(g, personId);
 }
 
-export function spousesOf(g: Graph, personId: string): { spouseId: string; union: UnionRecord }[] {
-  return g.getSpousesOf(personId);
+export function spousesOf(g: Graph, personId: string): readonly { spouseId: string; union: UnionRecord }[] {
+  return g.spousesOf(personId);
 }
 
 export function personOf(g: Graph, personId: string): DescendancyPerson | undefined {
-  return g.getPerson(personId);
+  return g.people.get(personId);
 }
 
 // ─── reading built trees ───────────────────────────────────────────────────
@@ -146,6 +142,6 @@ export function emptyState(rootId: string, viewState: ViewState = {}): TreeState
 }
 
 /** People map behind a chart adapter returned by useChartViewFetch (empty when none). */
-export function peopleOfAdapter(adapter: ChartViewBuildAdapter | null): Map<string, DescendancyPerson> {
-  return adapter ? adapter.getDataBuilder().getPeople() : new Map();
+export function peopleOfAdapter(adapter: ChartViewBuildAdapter | null): ReadonlyMap<string, DescendancyPerson> {
+  return adapter ? adapter.graph.people : new Map();
 }

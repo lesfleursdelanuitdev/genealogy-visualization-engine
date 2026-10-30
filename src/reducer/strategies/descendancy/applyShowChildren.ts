@@ -4,7 +4,7 @@
  * Case 2 (at max depth): prune top generation, re-root to R' from G_2, preserve G_2 row (expandDownTopRow).
  */
 
-import { getUnionsByPerson, getPeople } from "../../../builder/currentBuilder";
+import type { GraphSnapshot } from "../../../graph";
 import type { TreeState } from "../../types";
 import type { ViewState } from "../../../types";
 import { pushHistory } from "../../pushHistory";
@@ -17,8 +17,8 @@ function viewState(state: TreeState): ViewState {
  * Build ordered list of person IDs in the current "second generation" (union row from root).
  * Used as expandDownTopRow so layout can preserve that row when we re-root.
  */
-function getSecondGenerationOrdered(rootId: string): string[] {
-  const unions = getUnionsByPerson().get(rootId) ?? [];
+function getSecondGenerationOrdered(graph: GraphSnapshot, rootId: string): string[] {
+  const unions = graph.unionsOf(rootId);
   return unions.flatMap((u) =>
     u.husb === rootId ? [u.husb, u.wife] : [u.wife, u.husb]
   );
@@ -28,7 +28,8 @@ export function applyShowChildren(
   state: TreeState,
   personId: string,
   atMaxDepth: boolean,
-  currentDepth?: number
+  currentDepth: number | undefined,
+  graph: GraphSnapshot
 ): TreeState {
   const vs = viewState(state);
 
@@ -40,7 +41,7 @@ export function applyShowChildren(
       displayDepth: nextDepth,
       currentDepth: nextDepth,
     };
-    const people = getPeople();
+    const people = graph.people;
     const triggerP = people.get(personId);
     const triggerFullName =
       (triggerP ? `${triggerP.firstName ?? ""} ${triggerP.lastName ?? ""}`.trim() : null) || personId;
@@ -55,7 +56,7 @@ export function applyShowChildren(
   }
 
   // Case 2: At max depth — prune G_1, promote G_2; pick R' from G_2, preserve row order.
-  const topRowOrder = getSecondGenerationOrdered(state.rootId);
+  const topRowOrder = getSecondGenerationOrdered(graph, state.rootId);
   if (topRowOrder.length === 0) return state;
 
   const newRootId = topRowOrder.includes(personId) ? personId : topRowOrder[0];
@@ -68,7 +69,7 @@ export function applyShowChildren(
     expandDownTopRow: topRowOrder,
   };
 
-  const people = getPeople();
+  const people = graph.people;
   const p = people.get(newRootId);
   const newRootFullName =
     (p ? `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim() : null) || newRootId;

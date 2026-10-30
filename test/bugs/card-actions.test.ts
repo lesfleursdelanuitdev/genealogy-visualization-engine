@@ -3,10 +3,11 @@
  */
 import { describe, expect, vi, afterEach } from "vitest";
 import { knownBug } from "../helpers/bugs";
-import { handlePersonCardAction, type HandlePersonCardActionContext } from "../../src";
+import { handlePersonCardAction, EMPTY_GRAPH, type HandlePersonCardActionContext } from "../../src";
 
 function context(): HandlePersonCardActionContext {
   return {
+    graph: EMPTY_GRAPH,
     dispatch: () => {},
     setDrawerPersonId: () => {},
     setPan: () => {},

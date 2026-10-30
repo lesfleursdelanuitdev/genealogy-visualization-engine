@@ -259,7 +259,7 @@ describe("B15: no console.log in production", () => {
   knownBug("B15", "changing the depth from the dropdown logs nothing", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const h = await renderHook(
-      () => useDepth({ dispatch: () => {}, viewState: {}, maxDepthRendered: 0, builder: null }),
+      () => useDepth({ dispatch: () => {}, viewState: {}, maxDepthRendered: 0, graph: null }),
       undefined
     );
     await act(async () => {

@@ -1,5 +1,5 @@
 import type { BuildTreeResult } from "../builder/build";
-import type { FamilyTreeBuilder } from "../builder/FamilyTreeBuilder";
+import type { GraphSnapshot } from "../graph";
 import type { ViewStrategyDescriptor } from "../strategies/ViewStrategyDescriptor";
 import { pedigreeDescriptor } from "../strategies/pedigree/pedigreeDescriptor";
 import type { ViewState } from "../types";
@@ -42,19 +42,15 @@ function unknownPlaceholder(slot: "father" | "mother" | "parent", anchorId: stri
 export class PedigreeChartBuilder implements ChartViewBuildAdapter {
   readonly strategyName = "pedigree" as const;
 
-  constructor(private readonly dataBuilder: FamilyTreeBuilder) {}
+  constructor(readonly graph: GraphSnapshot) {}
 
   getDescriptor(): ViewStrategyDescriptor {
     return pedigreeDescriptor;
   }
 
-  getDataBuilder(): FamilyTreeBuilder {
-    return this.dataBuilder;
-  }
-
   buildTreeResult(rootId: string, viewState: ViewState, maxDepth: number): BuildTreeResult {
-    const people = this.dataBuilder.snapshot.people;
-    const birthByChild = this.dataBuilder.snapshot.birthUnionByChild;
+    const people = this.graph.people;
+    const birthByChild = this.graph.birthUnionByChild;
     const effectiveDepth = viewState.currentDepth ?? maxDepth;
     const collapseAbovePersonId = (viewState.pedigreeAncestorCollapsePersonId ?? "").trim() || null;
 

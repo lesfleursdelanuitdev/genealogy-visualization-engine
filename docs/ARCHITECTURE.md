@@ -13,12 +13,11 @@ flowchart TD
   imp --> pg[("Postgres<br/>gedcom_individuals_v2, gedcom_families_v2,<br/>gedcom_parent_child_v2, ...")]
   pg --> routes["Public app routes (Prisma)<br/>/api/tree/descendancy, /pedigree, /sibling-view<br/>living-person redaction"]
   routes -->|"{ rootId, people, unions }"| fetch["useChartViewFetch<br/>maps JSON to DescendancyPerson[] + UnionRecord[]"]
-  fetch --> ftb["FamilyTreeBuilder<br/>indexes: unions by person, by id,<br/>parent unions, birth union per child"]
-  ftb --> glob["setCurrentBuilder (module global)"]
-  ftb --> adapter["ChartViewBuildAdapter<br/>Descendancy / Pedigree /<br/>VerticalPedigree / FanChart"]
-  red["treeReducer<br/>ViewState + history"] -->|"viewState, depth"| adapter
-  adapter -->|"buildTreeResult"| tree["ChartNode tree<br/>PersonNode + UnionNode subclasses"]
-  glob -.->|"getPeople, getUnionsByPerson"| tree
+  fetch --> snap["createGraphSnapshot<br/>indexes: unions by person, by id,<br/>parent unions, birth union per child"]
+  snap --> session["createChartSession<br/>Descendancy / Pedigree /<br/>VerticalPedigree / FanChart"]
+  snap --> red["treeReducer(state, action, graph)<br/>ViewState + history"]
+  red -->|"viewState, depth"| session
+  session -->|"buildTree / buildChart"| tree["ChartNode tree<br/>PersonNode + UnionNode subclasses"]
   tree --> desc["ViewStrategyDescriptor<br/>layout, getBounds, connectors"]
   tree --> fan["Fan chart<br/>buildFanGeometry, bindFanGeometry"]
   desc --> svg["App SVG components<br/>src/components/TreeViewer/v2"]
@@ -33,9 +32,9 @@ The admin app (the-gonsalves-family-admin, private) sends each uploaded GEDCOM f
 | Path | Responsibility |
 | --- | --- |
 | `src/types.ts` | `DescendancyPerson`, `UnionRecord`, `ViewState`, `SiblingView`, `LinkedUnionEntry` |
-| `src/builder/FamilyTreeBuilder.ts` | Takes people and unions, builds lookup maps once, exposes getters and the strategy descriptors |
-| `src/builder/currentBuilder.ts` | Module-level "current builder" and global getters (`getPeople`, `getUnionsByPerson`, ...) |
-| `src/builder/build.ts` | Generic top-down `buildTree(rootId, strategy, options)` used by descendancy |
+| `src/graph/` | `GraphSnapshot`: people and unions with every lookup index, built once by `createGraphSnapshot` |
+| `src/session/` | `createChartSession({ graph, viewState, options })` and `layoutChart`: the app-facing entry point |
+| `src/builder/build.ts` | Generic top-down `buildTree(rootId, strategy, { graph, maxDepth })` used by descendancy |
 | `src/nodes/` | Node model: `PersonNode`, `UnionNode` and its subclasses `NormalUnionNode`, `CatchAllNode`, `LinkedParentNode`, `SiblingAdoptiveUnionNode`; `FamilyTreeNodeFactory` |
 | `src/strategies/ViewStrategyDescriptor.ts` | The descriptor interface every chart type implements |
 | `src/strategies/descendancy/` | Union-node rules (`DescendancyViewStrategy.ts`), two-pass layout, bounds, connector points, `+N` descendant counts |
@@ -46,7 +45,7 @@ The admin app (the-gonsalves-family-admin, private) sends each uploaded GEDCOM f
 | `src/reducer/` | `treeReducer`: core actions in `handlers.ts`, per-strategy reducers registered in `strategies/registry.ts` |
 | `src/hooks/` | React hooks: fetch and adapter setup, pan/zoom, search, depth, spouse drawer, panel visibility |
 | `src/helpers/` | Card actions, legend items, viewport fitting, node serialisation |
-| `src/testdata/` | A small fictional family for demos, plus a facade that re-exports the global getters |
+| `test/fixtures/smith/` | A small fictional family for tests and demos (not part of the package) |
 
 ## Key types
 
@@ -60,7 +59,7 @@ The admin app (the-gonsalves-family-admin, private) sends each uploaded GEDCOM f
 
 **Descendancy** (`strategies/descendancy/layout.ts`). The tree alternates person, union, children. Pass one walks post-order and sets each node's width: a leaf card is `PERSON_WIDTH`, a union with no children is the union card width, and any other node is the larger of its own card and the sum of its children's widths plus gaps. Pass two walks pre-order from `x = 0`. It centres the children's total span under the parent and gives each child a slot equal to its width. A person whose children are all unions is a "container": its unions stay on the same row as the person, and only their children move down one row. Union nodes also place their left and right cards at fixed offsets so search and bounds see real positions. `markUnions` then flags the first union of each person as primary for connector styling.
 
-The build that feeds this layout is `buildTree` with `DescendancyViewStrategy`. For each person, the strategy returns union nodes only for spouses the user has revealed. Children of unrevealed unions go under a `CatchAllNode`. Linked-parent and sibling-adoptive nodes cover the sibling view and children with more than one family. A person met a second time becomes a shadow card with no children, which stops cycles. At the depth limit, `countDescendants` (memoised, cleared on each fetch) sets a `+N` badge.
+The build that feeds this layout is `buildTree` with `DescendancyViewStrategy`. For each person, the strategy returns union nodes only for spouses the user has revealed. Children of unrevealed unions go under a `CatchAllNode`. Linked-parent and sibling-adoptive nodes cover the sibling view and children with more than one family. A person met a second time becomes a shadow card with no children, which stops cycles. At the depth limit, `countDescendants` (memoised per graph snapshot) sets a `+N` badge.
 
 **Pedigree** (`strategies/pedigree/pedigreeLayout.ts`). `PedigreeChartBuilder` builds a binary ancestor tree from each person's birth union. The builder prefers the union where the child's `pedi` is `birth`, and the API applies the user's `FAMC` choice. A missing father or mother becomes an "Unknown" placeholder card. Layout: leaves get evenly spaced y values in depth-first order, father branch first. Each person's y is the midpoint of their two parents. x comes from the generation: the root column, then a compact step (a third of the configured gap) for inner generations, then the full gap for the outermost one. Generation 1 also gets the full gap when root siblings are shown. Finally all y values shift so the top card starts at 0.
 
@@ -82,18 +81,16 @@ The build that feeds this layout is `buildTree` with `DescendancyViewStrategy`. 
 | Fan and vertical pedigree reuse the pedigree build and API | They share its limits (one birth family per person) | One fetch shape serves three ancestor views |
 | Graph keyed by GEDCOM xref | Xrefs are only unique within one tree file | The API routes and URLs already use xrefs |
 | Revisited people become shadow cards | A person can appear twice | Stops infinite recursion on pedigree collapse or bad data, and still shows the link |
-| Indexes built once in `FamilyTreeBuilder` | Rebuilt on every fetch | Replaced repeated full scans of the union list (see `src/DESCENDANCY_PERFORMANCE_REFACTOR.md`) |
-| Ships TypeScript source (`exports` to `src/`) | The app must transpile it | No build or publish step |
+| Indexes built once in `GraphSnapshot` | Rebuilt when the data changes | Replaced repeated full scans and per-call map copies (see `src/DESCENDANCY_PERFORMANCE_REFACTOR.md`) |
+| `dist/` is ESM with extensionless imports | Needs a bundler; bare Node ESM can't load it | The source keeps its import style; both consumers (Next, Vite) bundle |
 
 ## Testing
 
-There are no tests. The repo has no test runner, no test files and no `scripts` in `package.json` (118 source files, all `.ts`). `src/testdata/` holds about 400 lines of fixture data and helpers that a future test suite could use. Type-checking with `npx tsc --noEmit` needs the dev dependencies installed.
+`npm run check` runs the type check (`src/` and `test/`), the build and vitest. `test/app/` holds the 74 engine tests copied from the Gonsalves app; `test/bugs/` holds `it.fails` repros for the 2026-10-17 audit's open bugs; `test/boundaries.test.ts` fails if production code imports test data or brings back a global builder. Hook tests run in jsdom.
 
 ## Known limitations
 
-- **Global current builder.** `buildTree`, the descendancy strategy, several descendancy reducer handlers and two helpers read the graph through module-level getters. `setCurrentBuilder` must be called before building, and only one tree can be active per JavaScript context. The descriptors and `BuildContext` already carry the data, so the globals are partly redundant.
-- **Runtime code imports from `testdata`.** Those imports go through a facade that re-exports the builder getters, so they read real data, but the module name is misleading. `REFACTOR_PLAN.md` plans an explicit `GraphSnapshot` to replace both.
-- **Fixed API routes.** `useChartViewFetch` hard-codes `/api/tree/descendancy`, `/api/tree/pedigree` and `/api/tree/sibling-view`.
-- **Fan chart bounds** are computed from radius alone (`minX: 0`, `maxX: radius`), not from the cells.
+- **Fixed API routes.** `useChartViewFetch` hard-codes `/api/tree/descendancy`, `/api/tree/pedigree` and `/api/tree/sibling-view` (refactor phase 4).
+- **Open audit bugs**, listed in `docs/v0.1.0-progress.md` and reproduced in `test/bugs/`, among them the fan-chart bounds (computed from the radius alone) and the stale-fetch race.
+- **Server logic.** The Gonsalves routes compute the sibling view, parent-family choice and redaction; a standalone viewer must do this in JavaScript (`docs/server-logic-for-standalone.md`).
 - **Peer dependency** on `@tanstack/react-query` is declared but the source does not import it.
-- No tests, as above.

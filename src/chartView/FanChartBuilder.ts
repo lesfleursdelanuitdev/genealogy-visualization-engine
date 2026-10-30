@@ -1,5 +1,5 @@
 import type { BuildTreeResult } from "../builder/build";
-import type { FamilyTreeBuilder } from "../builder/FamilyTreeBuilder";
+import type { GraphSnapshot } from "../graph";
 import type { ViewStrategyDescriptor } from "../strategies/ViewStrategyDescriptor";
 import type { ViewState } from "../types";
 import type { ChartViewBuildAdapter } from "./ChartViewBuildAdapter";
@@ -13,16 +13,12 @@ export class FanChartBuilder implements ChartViewBuildAdapter {
   readonly strategyName = "fan_chart" as const;
   private readonly inner: PedigreeChartBuilder;
 
-  constructor(dataBuilder: FamilyTreeBuilder) {
-    this.inner = new PedigreeChartBuilder(dataBuilder);
+  constructor(readonly graph: GraphSnapshot) {
+    this.inner = new PedigreeChartBuilder(graph);
   }
 
   getDescriptor(): ViewStrategyDescriptor {
     return fanChartDescriptor;
-  }
-
-  getDataBuilder(): FamilyTreeBuilder {
-    return this.inner.getDataBuilder();
   }
 
   buildTreeResult(rootId: string, viewState: ViewState, maxDepth: number): BuildTreeResult {

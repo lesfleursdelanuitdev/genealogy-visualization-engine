@@ -1,6 +1,6 @@
 import type { TreeState } from "../../types";
 import type { ViewState } from "../../../types";
-import { getPeople } from "../../../builder/currentBuilder";
+import type { GraphSnapshot } from "../../../graph";
 import { pushHistory } from "../../pushHistory";
 import { withoutFamilyUnitScope } from "./familyUnitScope";
 
@@ -8,8 +8,8 @@ function viewState(state: TreeState): ViewState {
   return state.viewState as ViewState;
 }
 
-function getFullName(personId: string): string {
-  const person = getPeople().get(personId);
+function getFullName(graph: GraphSnapshot, personId: string): string {
+  const person = graph.people.get(personId);
   if (!person) return personId;
   return `${person.firstName ?? ""} ${person.lastName ?? ""}`.trim() || personId;
 }
@@ -17,16 +17,17 @@ function getFullName(personId: string): string {
 export function applyDrawerSelect(
   state: TreeState,
   personId: string,
-  spouseId: string
+  spouseId: string,
+  graph: GraphSnapshot
 ): TreeState {
   const vs = state.viewState as ViewState;
   const nextRevealed = new Map(vs.revealedUnions ?? []);
   const existing = nextRevealed.get(personId) ?? [];
   if (!existing.includes(spouseId)) nextRevealed.set(personId, [...existing, spouseId]);
   const newViewState = { ...withoutFamilyUnitScope(vs), revealedUnions: nextRevealed };
-  const personName = getFullName(personId);
-  const spouseName = getFullName(spouseId);
-  const person = getPeople().get(personId);
+  const personName = getFullName(graph, personId);
+  const spouseName = getFullName(graph, spouseId);
+  const person = graph.people.get(personId);
   const initials = person
     ? ((person.firstName?.trim() || "")[0] ?? "") + ((person.lastName?.trim() || "")[0] ?? "")
     : "?";

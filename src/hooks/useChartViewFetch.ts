@@ -1,15 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { clearCurrentBuilder, setCurrentBuilder, FamilyTreeBuilder } from "../builder";
+import { createGraphSnapshot, type GraphSnapshot } from "../graph";
 import { DEFAULT_MAX_DEPTH } from "../constants";
 import type { DescendancyPerson } from "../types";
 import type { SiblingView } from "../types";
 import type { ChartViewStrategyName } from "../chartView/chartViewStrategyName";
-import { DescendancyChartAdapter } from "../chartView/DescendancyChartAdapter";
-import { PedigreeChartBuilder } from "../chartView/PedigreeChartBuilder";
-import { VerticalPedigreeChartBuilder } from "../chartView/VerticalPedigreeChartBuilder";
-import { FanChartBuilder } from "../chartView/FanChartBuilder";
+import { createChartAdapter } from "../chartView/createChartAdapter";
 import type { ChartViewBuildAdapter } from "../chartView/ChartViewBuildAdapter";
 import {
   chartSwitchAdapterFromPayloadBegin,
@@ -104,6 +101,8 @@ export interface UseChartViewFetchResult {
   isChartLoading: boolean;
   chartDataKey: number;
   chartAdapter: ChartViewBuildAdapter | null;
+  /** The loaded people and unions (same object as `chartAdapter.graph`); bind the reducer to it. */
+  graph: GraphSnapshot | null;
   /** Pedigree API: xrefs of people in the chart who are a child in more than one family (for card actions). */
   pedigreeMultiFamilyChildXrefs: string[];
 }
@@ -137,8 +136,7 @@ export function useChartViewFetch(
   useEffect(() => {
     const useSiblingView =
       strategyName === "descendancy" && Boolean(siblingViewPersonId?.trim());
-    if (DEBUG_BUILDER) console.log("[FamilyTreeBuilder] Fetch started, clearing builder");
-    clearCurrentBuilder();
+    if (DEBUG_BUILDER) console.log("[useChartViewFetch] Fetch started");
     setChartAdapter(null);
     setPedigreeMultiFamilyChildXrefs([]);
     const tid = setTimeout(() => {
@@ -189,17 +187,8 @@ export function useChartViewFetch(
           if (usesPedigreeApi) {
             setPedigreeMultiFamilyChildXrefs(data.multiFamilyChildXrefs ?? []);
           }
-          const treeBuilder = new FamilyTreeBuilder({ people: peopleList, unions });
-          const adapter: ChartViewBuildAdapter =
-            strategyName === "pedigree"
-              ? new PedigreeChartBuilder(treeBuilder)
-              : strategyName === "vertical_pedigree"
-                ? new VerticalPedigreeChartBuilder(treeBuilder)
-                : strategyName === "fan_chart"
-                  ? new FanChartBuilder(treeBuilder)
-                : new DescendancyChartAdapter(treeBuilder);
-          setChartAdapter(adapter);
-          setCurrentBuilder(treeBuilder);
+          const graph = createGraphSnapshot({ people: peopleList, unions });
+          setChartAdapter(createChartAdapter(strategyName, graph));
           setLastApiRootId(data.rootId);
           setChartDataKey((k) => k + 1);
           setIsChartLoading(false);
@@ -214,7 +203,6 @@ export function useChartViewFetch(
           err instanceof Error ? err.message : err
         );
         setChartAdapter(null);
-        clearCurrentBuilder();
         setLastApiRootId(null);
         setPedigreeMultiFamilyChildXrefs([]);
         setChartDataKey((k) => k + 1);
@@ -228,6 +216,7 @@ export function useChartViewFetch(
     isChartLoading,
     chartDataKey,
     chartAdapter,
+    graph: chartAdapter?.graph ?? null,
     pedigreeMultiFamilyChildXrefs,
   };
 }

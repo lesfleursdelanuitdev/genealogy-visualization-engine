@@ -8,6 +8,7 @@ import type { ChartNode } from "../nodes";
 import type { ViewState } from "../types";
 import type { LayoutBoundsOptions } from "../strategies/ViewStrategyDescriptor";
 import type { ChartViewBuildAdapter } from "../chartView/ChartViewBuildAdapter";
+import { layoutChart } from "../session/createChartSession";
 import { chartSwitchLayoutBegin, chartSwitchLayoutEnd } from "../debug/chartSwitchTiming";
 
 const DEBUG_BUILDER = process.env.NEXT_PUBLIC_DEBUG_DESCENDANCY === "true";
@@ -66,16 +67,11 @@ export function useTreeBuild({
 }: UseTreeBuildOptions): TreeBuildResult {
   return useMemo(() => {
     const currentDepth = viewState.currentDepth ?? viewState.displayDepth ?? maxDepth;
-    let rootNode: ChartNode;
-    let maxDepthRendered: number;
-    if (chartAdapter != null) {
-      const result = chartAdapter.buildTreeResult(effectiveRootId, viewState, maxDepth);
-      rootNode = result.root;
-      maxDepthRendered = result.maxDepthRendered;
-    } else {
-      rootNode = placeholderRoot(effectiveRootId);
-      maxDepthRendered = 0;
-    }
+    const built =
+      chartAdapter != null
+        ? chartAdapter.buildTreeResult(effectiveRootId, viewState, maxDepth)
+        : { root: placeholderRoot(effectiveRootId), maxDepthRendered: 0 };
+    const maxDepthRendered = built.maxDepthRendered;
     if (DEBUG_BUILDER) {
       console.log("[FamilyTreeBuilder] useTreeBuild", {
         source: chartAdapter != null ? chartAdapter.strategyName : "placeholder (no adapter)",
@@ -103,22 +99,18 @@ export function useTreeBuild({
       layoutOptions.personWidth = personWidth;
     }
     const layoutOpts = Object.keys(layoutOptions).length > 0 ? layoutOptions : undefined;
-    let b: { minX: number; maxX: number; maxY: number };
     chartSwitchLayoutBegin();
     try {
-      strategy.layout(rootNode, layoutOpts);
-      strategy.markUnions?.(rootNode);
-      b = strategy.getBounds(rootNode, layoutOpts);
+      const chart = layoutChart(strategy, built, layoutOpts);
+      return {
+        root: chart.root,
+        baseX: chart.baseX,
+        baseY: chart.baseY,
+        bounds: chart.bounds,
+        maxDepthRendered: chart.maxDepthRendered,
+      };
     } finally {
       chartSwitchLayoutEnd();
     }
-    const padding = strategy.constants.PADDING;
-    return {
-      root: rootNode,
-      baseX: -b.minX + padding,
-      baseY: padding,
-      bounds: b,
-      maxDepthRendered,
-    };
   }, [effectiveRootId, viewState, maxDepth, chartDataKey, chartAdapter, effectivePersonHeight, parentPairGap, pedigreeGenerationGap, showRootSiblings, personWidth]);
 }

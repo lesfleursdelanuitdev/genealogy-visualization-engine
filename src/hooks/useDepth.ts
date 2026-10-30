@@ -4,13 +4,14 @@ import { useState, useCallback, useEffect } from "react";
 import { DEFAULT_MAX_DEPTH } from "../constants";
 import type { ViewState } from "../types";
 import type { TreeAction } from "../reducer/types";
-import type { FamilyTreeBuilder } from "../builder";
+import type { GraphSnapshot } from "../graph";
 
 export interface UseDepthOptions {
   dispatch: React.Dispatch<TreeAction>;
   viewState: ViewState;
   maxDepthRendered: number;
-  builder: FamilyTreeBuilder | null | undefined;
+  /** The chart's loaded graph; null until data has loaded. */
+  graph: GraphSnapshot | null | undefined;
   /**
    * Some strategies (pedigree/fan) have rendered-depth semantics that should not overwrite user-selected depth.
    */
@@ -33,7 +34,7 @@ export function useDepth({
   dispatch,
   viewState,
   maxDepthRendered,
-  builder,
+  graph,
   disableRenderedDepthSync = false,
 }: UseDepthOptions): UseDepthResult {
   const [maxDepth, setMaxDepth] = useState(DEFAULT_MAX_DEPTH);
@@ -75,7 +76,7 @@ export function useDepth({
   // After re-root or "Show parents", rendered depth may be less or more than current; keep reducer and UI in sync.
   useEffect(() => {
     if (disableRenderedDepthSync) return;
-    if (builder == null) return;
+    if (graph == null) return;
     if (maxDepthRendered === 0) return; // no tree built yet
     if (viewState.displayDepth != null) return; // let Show children / displayDepth drive depth for this build
     const current = effectiveCurrentDepth;
@@ -89,7 +90,7 @@ export function useDepth({
       setMaxDepth(maxDepthRendered);
     }
   }, [
-    builder,
+    graph,
     maxDepthRendered,
     effectiveCurrentDepth,
     viewState.displayDepth,
@@ -100,11 +101,11 @@ export function useDepth({
   // When displayDepth was set (e.g. Show children) and we've built that deep, sync maxDepth
   useEffect(() => {
     if (disableRenderedDepthSync) return;
-    if (builder == null || viewState.displayDepth == null) return;
+    if (graph == null || viewState.displayDepth == null) return;
     if (maxDepthRendered >= viewState.displayDepth) {
       setMaxDepth(viewState.displayDepth);
     }
-  }, [builder, maxDepthRendered, viewState.displayDepth, disableRenderedDepthSync]);
+  }, [graph, maxDepthRendered, viewState.displayDepth, disableRenderedDepthSync]);
 
   const currentDepthRendered = maxDepthRendered;
   const atMaxDepth = currentDepthRendered >= DEFAULT_MAX_DEPTH;

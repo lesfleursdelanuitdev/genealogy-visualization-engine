@@ -3,6 +3,7 @@
  */
 
 import type { TreeAction, TreeState } from "./types";
+import type { GraphSnapshot } from "../graph";
 import { applyRoot } from "./applyRoot";
 import { applyRootKeepView } from "./applyRootKeepView";
 import { applySetViewStrategy } from "./applySetViewStrategy";
@@ -18,15 +19,15 @@ import {
   applyPedigreeSetFamcForPerson,
 } from "./applyPedigreeViewPatches";
 
-export type Handler = (state: TreeState, action: TreeAction) => TreeState;
+export type Handler = (state: TreeState, action: TreeAction, graph: GraphSnapshot) => TreeState;
 
 export const coreHandlers: Partial<Record<TreeAction["type"], Handler>> = {
-  ROOT: (s, a) => {
+  ROOT: (s, a, graph) => {
     const x = a as Extract<TreeAction, { type: "ROOT" }>;
-    return applyRoot(s, x.personId, x.pedigreeFamcFamilyXref);
+    return applyRoot(s, x.personId, x.pedigreeFamcFamilyXref, graph);
   },
-  ROOT_KEEP_VIEW: (s, a) =>
-    applyRootKeepView(s, (a as Extract<TreeAction, { type: "ROOT_KEEP_VIEW" }>).personId),
+  ROOT_KEEP_VIEW: (s, a, graph) =>
+    applyRootKeepView(s, (a as Extract<TreeAction, { type: "ROOT_KEEP_VIEW" }>).personId, graph),
   SET_VIEW_STRATEGY: (s, a) => {
     const x = a as Extract<TreeAction, { type: "SET_VIEW_STRATEGY" }>;
     return applySetViewStrategy(s, x.strategyName, x.pedigreeFamcFamilyXref);

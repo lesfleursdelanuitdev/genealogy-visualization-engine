@@ -1,4 +1,3 @@
-import { getPeople } from "../builder/currentBuilder";
 import type { PersonCardAction, HandlePersonCardActionContext } from "./types";
 
 export function handlePersonCardAction(
@@ -16,11 +15,11 @@ export function handlePersonCardAction(
     setRootDisplayNames,
     triggerBlinkBack,
     settings,
+    graph,
   } = ctx;
 
   if (action === "root") {
-    const peopleMap = getPeople();
-    const person = peopleMap.get(personId);
+    const person = graph.people.get(personId);
     if (person) {
       const name = (person.firstName + " " + person.lastName).trim();
       setRootDisplayNames((prev) => ({ ...prev, [personId]: name }));

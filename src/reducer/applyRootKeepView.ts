@@ -6,9 +6,10 @@
 import type { TreeState } from "./types";
 import { pushHistory } from "./pushHistory";
 import { getPersonDisplay } from "./getPersonDisplay";
+import type { GraphSnapshot } from "../graph";
 
-export function applyRootKeepView(state: TreeState, personId: string): TreeState {
-  const { fullName, initials } = getPersonDisplay(personId);
+export function applyRootKeepView(state: TreeState, personId: string, graph: GraphSnapshot): TreeState {
+  const { fullName, initials } = getPersonDisplay(graph, personId);
   const actionLabel = fullName ? `Go to ${fullName}` : "Go to root";
   const hist = pushHistory(state, personId, state.viewState, actionLabel, undefined, {
     rootPersonFullName: fullName,

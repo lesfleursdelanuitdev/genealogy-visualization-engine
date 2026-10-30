@@ -6,11 +6,13 @@ import type { TreeState } from "./types";
 import { pushHistory } from "./pushHistory";
 import { getStrategyReducer } from "./strategies/registry";
 import { getPersonDisplay } from "./getPersonDisplay";
+import type { GraphSnapshot } from "../graph";
 
 export function applyRoot(
   state: TreeState,
   personId: string,
-  pedigreeFamcFamilyXref?: string | null
+  pedigreeFamcFamilyXref: string | null | undefined,
+  graph: GraphSnapshot
 ): TreeState {
   const strategy = getStrategyReducer(state.strategyName);
   const base = strategy?.getInitialViewState() ?? {};
@@ -26,7 +28,7 @@ export function applyRoot(
     ...base,
     ...(famc != null ? { pedigreeFamcFamilyXref: famc } : {}),
   };
-  const { fullName, initials } = getPersonDisplay(personId);
+  const { fullName, initials } = getPersonDisplay(graph, personId);
   const actionLabel = `Make ${fullName} root`;
   const hist = pushHistory(state, personId, newViewState, actionLabel, undefined, {
     rootPersonFullName: fullName,

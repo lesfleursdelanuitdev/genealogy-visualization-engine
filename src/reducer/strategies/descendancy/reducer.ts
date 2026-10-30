@@ -1,5 +1,6 @@
 import type { TreeState } from "../../types";
 import type { DescendancyAction } from "./types";
+import type { GraphSnapshot } from "../../../graph";
 import { applyRevealSpouse } from "./applyRevealSpouse";
 import { applyCloseSpouse } from "./applyCloseSpouse";
 import { applyRevealAllSpouses } from "./applyRevealAllSpouses";
@@ -18,52 +19,57 @@ import { applyCollapseSubtree } from "./applyCollapseSubtree";
 import { applyExpandSubtree } from "./applyExpandSubtree";
 import { applySetFamilyUnitScope } from "./applySetFamilyUnitScope";
 
-type Handler = (state: TreeState, action: DescendancyAction) => TreeState;
+type Handler = (state: TreeState, action: DescendancyAction, graph: GraphSnapshot) => TreeState;
 
 const handlers: Record<DescendancyAction["type"], Handler> = {
-  REVEAL_SPOUSE: (s, a) => applyRevealSpouse(s, (a as Extract<DescendancyAction, { type: "REVEAL_SPOUSE" }>).personId, (a as Extract<DescendancyAction, { type: "REVEAL_SPOUSE" }>).spouseId),
+  REVEAL_SPOUSE: (s, a, graph) => {
+    const d = a as Extract<DescendancyAction, { type: "REVEAL_SPOUSE" }>;
+    return applyRevealSpouse(s, d.personId, d.spouseId, graph);
+  },
   CLOSE_SPOUSE: (s, a) => applyCloseSpouse(s, (a as Extract<DescendancyAction, { type: "CLOSE_SPOUSE" }>).spouseId),
-  REVEAL_ALL_SPOUSES: (s) => applyRevealAllSpouses(s),
+  REVEAL_ALL_SPOUSES: (s, _a, graph) => applyRevealAllSpouses(s, graph),
   CLOSE_ALL_SPOUSES: (s) => applyCloseAllSpouses(s),
   CLOSE_LINKED_UNION: (s, a) => applyCloseLinkedUnion(s, (a as Extract<DescendancyAction, { type: "CLOSE_LINKED_UNION" }>).personId),
-  SHOW_SIBLINGS: (s, a) => applyShowSiblings(s, (a as Extract<DescendancyAction, { type: "SHOW_SIBLINGS" }>).personId),
+  SHOW_SIBLINGS: (s, a, graph) =>
+    applyShowSiblings(s, (a as Extract<DescendancyAction, { type: "SHOW_SIBLINGS" }>).personId, graph),
   SET_SIBLING_VIEW_FROM_API: (s, a) =>
     applySetSiblingViewFromApi(s, (a as Extract<DescendancyAction, { type: "SET_SIBLING_VIEW_FROM_API" }>).siblingView),
-  PARENTS: (s, a) => applyParents(s, (a as Extract<DescendancyAction, { type: "PARENTS" }>).personId),
-  DRAWER_SELECT: (s, a) => {
+  PARENTS: (s, a, graph) => applyParents(s, (a as Extract<DescendancyAction, { type: "PARENTS" }>).personId, graph),
+  DRAWER_SELECT: (s, a, graph) => {
     const d = a as Extract<DescendancyAction, { type: "DRAWER_SELECT" }>;
-    return applyDrawerSelect(s, d.personId, d.spouseId);
+    return applyDrawerSelect(s, d.personId, d.spouseId, graph);
   },
-  DRAWER_SELECT_ALL: (s, a) => {
+  DRAWER_SELECT_ALL: (s, a, graph) => {
     const d = a as Extract<DescendancyAction, { type: "DRAWER_SELECT_ALL" }>;
-    return applyDrawerSelectAll(s, d.personId);
+    return applyDrawerSelectAll(s, d.personId, graph);
   },
-  CLOSE_ALL_SPOUSES_FOR_PERSON: (s, a) => {
+  CLOSE_ALL_SPOUSES_FOR_PERSON: (s, a, graph) => {
     const d = a as Extract<DescendancyAction, { type: "CLOSE_ALL_SPOUSES_FOR_PERSON" }>;
-    return applyCloseAllSpousesForPerson(s, d.personId);
+    return applyCloseAllSpousesForPerson(s, d.personId, graph);
   },
-  SHOW_CHILDREN: (s, a) => {
+  SHOW_CHILDREN: (s, a, graph) => {
     const d = a as Extract<DescendancyAction, { type: "SHOW_CHILDREN" }>;
-    return applyShowChildren(s, d.personId, d.atMaxDepth, d.currentDepth);
+    return applyShowChildren(s, d.personId, d.atMaxDepth, d.currentDepth, graph);
   },
   SET_CURRENT_DEPTH: (s, a) =>
     applySetCurrentDepth(s, (a as Extract<DescendancyAction, { type: "SET_CURRENT_DEPTH" }>).depth),
-  PAN_TO_PERSON: (s, a) =>
-    applyPanToPerson(s, (a as Extract<DescendancyAction, { type: "PAN_TO_PERSON" }>).personId),
+  PAN_TO_PERSON: (s, a, graph) =>
+    applyPanToPerson(s, (a as Extract<DescendancyAction, { type: "PAN_TO_PERSON" }>).personId, graph),
   COLLAPSE_SUBTREE: (s, a) =>
     applyCollapseSubtree(s, (a as Extract<DescendancyAction, { type: "COLLAPSE_SUBTREE" }>).personId),
   EXPAND_SUBTREE: (s, a) =>
     applyExpandSubtree(s, (a as Extract<DescendancyAction, { type: "EXPAND_SUBTREE" }>).personId),
-  SET_FAMILY_UNIT_SCOPE: (s, a) => {
+  SET_FAMILY_UNIT_SCOPE: (s, a, graph) => {
     const d = a as Extract<DescendancyAction, { type: "SET_FAMILY_UNIT_SCOPE" }>;
-    return applySetFamilyUnitScope(s, d.personId, d.spouseId, d.familyXref);
+    return applySetFamilyUnitScope(s, d.personId, d.spouseId, d.familyXref, graph);
   },
 };
 
 export function reduceDescendancy(
   state: TreeState,
-  action: DescendancyAction
+  action: DescendancyAction,
+  graph: GraphSnapshot
 ): TreeState {
   const handler = handlers[action.type];
-  return handler ? handler(state, action) : state;
+  return handler ? handler(state, action, graph) : state;
 }

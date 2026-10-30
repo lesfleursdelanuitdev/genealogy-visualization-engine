@@ -1,11 +1,11 @@
 /**
- * Helpers for history entry display: full name and initials from getPeople() at action time.
+ * Helpers for history entry display: full name and initials from the chart's graph at action time.
  */
 
-import { getPeople } from "../builder/currentBuilder";
+import type { GraphSnapshot } from "../graph";
 
-export function getPersonDisplay(personId: string): { fullName: string; initials: string } {
-  const p = getPeople().get(personId);
+export function getPersonDisplay(graph: GraphSnapshot, personId: string): { fullName: string; initials: string } {
+  const p = graph.people.get(personId);
   const fullName =
     (p ? `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim() : null) || personId;
   const initials = p
