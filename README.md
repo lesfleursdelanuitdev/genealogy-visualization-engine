@@ -155,7 +155,7 @@ Only the newest request counts: a new root aborts the old request and late answe
 
 **"+N" chips.** On all four charts, a card at the depth limit or on a collapsed branch has `_hiddenCount`: how many different people are hidden beyond it (descendants, or ancestors on the ancestor charts). Dispatch `{ type: "SHOW_HIDDEN", personId }` when the chip is tapped: that branch gets one more generation, and a history entry is pushed.
 
-**Pan and zoom** (`usePanZoom`): draw at `translate(baseX + pan.x, baseY + pan.y) scale(scale)`. The hook adds its own non-passive wheel and touch listeners and sets `touch-action: none` on the `<svg>`; wire only `onPointerDown/Move/Up`. Pass `viewKey` (e.g. `${chart}:${root}`) so the initial view applies once per chart. A press on a `button`, link or `[data-chart-interactive]` stays a tap unless it moves 4 px.
+**Pan and zoom** (`usePanZoom`): draw at `translate(baseX + pan.x, baseY + pan.y) scale(scale)`. The hook adds its own non-passive wheel and touch listeners and sets `touch-action: none` on the `<svg>`; wire only `onPointerDown/Move/Up`. Pass `viewKey` (e.g. `${chart}:${root}`) so the initial view applies once per chart. A press on a `button`, link or `[data-chart-interactive]` stays a tap unless it moves past the pan threshold (`panThreshold`, default 6 px for mouse and pen, 10 px for touch).
 
 See `CHANGELOG.md` for what changed in 0.1.0.
 

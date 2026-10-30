@@ -49,6 +49,7 @@ The engine now stands alone: its one input is a `GraphSnapshot` of the whole fam
 - `_hiddenCount` now means "distinct people hidden beyond this card in the chart's direction" and is set on all four charts (see Added).
 - `usePanZoom` no longer returns `onWheel`: it adds its own non-passive wheel listener. Remove `onWheel={onWheel}` from the `<svg>`, or every notch zooms twice. It sets `touch-action: none` on the `<svg>`. Pass `viewKey` (e.g. chart type + root) so the initial view applies once per chart; a bounds change alone now keeps the zoom and keeps the content still.
 - Zoom limits are options, `minZoom` (default **0.05**, was a fixed 0.2) and `maxZoom` (default 3). Fit picks the zoom that fits (never above 100%) within the limits; it used to stop at 25%, so a wide chart overflowed a phone.
+- A press pans only after moving past `panThreshold` (per pointer type; default 6 px for mouse and pen, 10 px for touch). Below it no pan starts, no pointer capture is taken, and the click or tap reaches its button (R6: a fixed 4 px threshold lost about 2 in 7 laptop clicks).
 - `zoomIn` / `zoomOut` zoom around the viewport centre (they zoomed around the layout origin) and take `{ focus: { x, y } }` for another screen point. Wire them as `onClick={() => zoomIn()}`, not `onClick={zoomIn}`.
 
 **Package**

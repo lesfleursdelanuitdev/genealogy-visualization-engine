@@ -17,8 +17,21 @@ const ZOOM_STEP = 1.2;
 const INITIAL_SCALE = 0.72;
 /** Vertical offset for root when applying initial view and fit-to-screen. */
 const INITIAL_TOP_PADDING = 110;
-/** A press becomes a pan only after moving this far (px), so taps with finger jitter stay taps. */
-const PAN_THRESHOLD_PX = 4;
+/**
+ * A press becomes a pan only after moving this far (px), per pointer type (R6): below it the
+ * press stays a click or tap and its events reach the target untouched. Laptop clicks often
+ * drift 4-5 px and fingers more.
+ */
+const DEFAULT_PAN_THRESHOLD = { mouse: 6, pen: 6, touch: 10 } as const;
+
+export interface PanThresholdOptions {
+  /** Default 6 px. */
+  mouse?: number;
+  /** Default 6 px. */
+  pen?: number;
+  /** Default 10 px. */
+  touch?: number;
+}
 /** Targets that must keep their own press, focus and click: card buttons, links, fields. */
 const INTERACTIVE_SELECTOR =
   'button, a[href], input, select, textarea, label, [role="button"], [data-chart-interactive]';
@@ -29,6 +42,8 @@ function isInteractive(target: EventTarget | null): boolean {
 
 interface DragState {
   pointerId: number;
+  /** Distance (px) this pointer must move before it pans. */
+  threshold: number;
   startX: number;
   startY: number;
   startPan: { x: number; y: number };
@@ -58,6 +73,8 @@ export interface UsePanZoomOptions {
   minZoom?: number;
   /** Largest zoom (default 3). */
   maxZoom?: number;
+  /** How far a press must move before it pans, per pointer type (R6). */
+  panThreshold?: PanThresholdOptions;
 }
 
 /** Options for zoomIn / zoomOut. */
@@ -80,6 +97,7 @@ export function usePanZoom({
   viewKey,
   minZoom = DEFAULT_MIN_ZOOM,
   maxZoom = DEFAULT_MAX_ZOOM,
+  panThreshold,
 }: UsePanZoomOptions) {
   const [pan, setPanState] = useState({ x: 0, y: 0 });
   const [scale, setScaleState] = useState(INITIAL_SCALE);
@@ -109,6 +127,8 @@ export function usePanZoom({
   boundsRef.current = bounds;
   embedModeRef.current = embedMode;
   limitsRef.current = { min: minZoom, max: maxZoom };
+  const thresholdRef = useRef({ ...DEFAULT_PAN_THRESHOLD, ...panThreshold });
+  thresholdRef.current = { ...DEFAULT_PAN_THRESHOLD, ...panThreshold };
   const clampZoom = useCallback(
     (s: number) => Math.min(limitsRef.current.max, Math.max(limitsRef.current.min, s)),
     []
@@ -273,16 +293,18 @@ export function usePanZoom({
 
   /**
    * One-pointer pan (T31). A press on a card button, link or field keeps its default (focus,
-   * :active) and stays a tap unless the pointer moves past PAN_THRESHOLD_PX; the pointer is
-   * captured only once a pan starts, so a tap's pointerup and click land on the button.
+   * :active) and stays a tap unless the pointer moves past its type's pan threshold (R6); the
+   * pointer is captured only once a pan starts, so a tap's pointerup and click land on the button.
    */
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0 || isPinchingRef.current) return;
     suppressClickRef.current = false;
     // Elsewhere, stop text selection and native image drag from starting.
     if (!isInteractive(e.target)) e.preventDefault();
+    const t = thresholdRef.current;
     dragRef.current = {
       pointerId: e.pointerId,
+      threshold: e.pointerType === "touch" ? t.touch : e.pointerType === "pen" ? t.pen : t.mouse,
       startX: e.clientX,
       startY: e.clientY,
       startPan: { ...panRef.current },
@@ -315,7 +337,7 @@ export function usePanZoom({
       const dx = e.clientX - d.startX;
       const dy = e.clientY - d.startY;
       if (!d.panning) {
-        if (Math.hypot(dx, dy) < PAN_THRESHOLD_PX) return;
+        if (Math.hypot(dx, dy) < d.threshold) return;
         d.panning = true;
         d.target.setPointerCapture?.(d.pointerId);
         capturedPointerRef.current = { el: d.target, id: d.pointerId };

@@ -32,6 +32,7 @@ export {
   type PanZoomBounds,
   type UsePanZoomOptions,
   type ZoomStepOptions,
+  type PanThresholdOptions,
 } from "./usePanZoom";
 export {
   useSpouseDrawer,

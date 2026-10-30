@@ -34,6 +34,7 @@ interface HarnessProps {
   baseX?: number;
   minZoom?: number;
   maxZoom?: number;
+  panThreshold?: { mouse?: number; pen?: number; touch?: number };
 }
 
 function useHarness(p: HarnessProps | undefined) {
@@ -45,6 +46,7 @@ function useHarness(p: HarnessProps | undefined) {
     baseY: BASE.y,
     minZoom: p?.minZoom,
     maxZoom: p?.maxZoom,
+    panThreshold: p?.panThreshold,
   });
   return { svgRef, pz };
 }
@@ -384,3 +386,76 @@ describe("R5: zoom in and out around a point", () => {
     await h.unmount();
   });
 });
+
+describe("R6: pan threshold per pointer type (mouse/pen 6 px, touch 10 px)", () => {
+  const click = () => new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 });
+
+  async function press(kind: "mouse" | "touch" | "pen", dx: number, dy: number, props?: HarnessProps) {
+    const onButton = vi.fn();
+    const r = await renderChart(onButton, props);
+    const capture = vi.spyOn(Element.prototype, "setPointerCapture");
+    const opts = { pointerType: kind };
+    const move = pointer("pointermove", 200 + dx, 300 + dy, 1, opts);
+    await act(async () => {
+      r.button.dispatchEvent(pointer("pointerdown", 200, 300, 1, opts));
+      r.button.dispatchEvent(move);
+      r.button.dispatchEvent(pointer("pointerup", 200 + dx, 300 + dy, 1, opts));
+      r.button.dispatchEvent(click());
+    });
+    const result = { onButton, pan: { ...r.h.current.pz.pan }, captured: capture.mock.calls.length, movePrevented: move.defaultPrevented };
+    await r.h.unmount();
+    return result;
+  }
+
+  for (let jitter = 0; jitter <= 5; jitter++) {
+    it(`a mouse click with ${jitter} px of jitter is a click`, async () => {
+      for (const [dx, dy] of [[jitter, 0], [0, jitter], [jitter * 0.7, -jitter * 0.7]]) {
+        const r = await press("mouse", dx, dy);
+        expect(r.onButton).toHaveBeenCalledTimes(1);
+        expect(r.pan).toEqual({ x: 0, y: 0 });
+        expect(r.captured).toBe(0);
+        expect(r.movePrevented).toBe(false);
+      }
+    });
+  }
+
+  for (let jitter = 0; jitter <= 9; jitter++) {
+    it(`a tap with ${jitter} px of finger jitter is a tap`, async () => {
+      const r = await press("touch", jitter, 0);
+      expect(r.onButton).toHaveBeenCalledTimes(1);
+      expect(r.pan).toEqual({ x: 0, y: 0 });
+      expect(r.captured).toBe(0);
+    });
+  }
+
+  it("a pen uses the mouse threshold", async () => {
+    expect((await press("pen", 5, 0)).onButton).toHaveBeenCalledTimes(1);
+    expect((await press("pen", 7, 0)).pan).toEqual({ x: 7, y: 0 });
+  });
+
+  it("just above the threshold it pans, captures the pointer, and the click is not a click", async () => {
+    const mouse = await press("mouse", 7, 0);
+    expect(mouse.pan).toEqual({ x: 7, y: 0 });
+    expect(mouse.captured).toBe(1);
+    expect(mouse.onButton).not.toHaveBeenCalled();
+    const finger = await press("touch", 0, 11);
+    expect(finger.pan).toEqual({ x: 0, y: 11 });
+    expect(finger.onButton).not.toHaveBeenCalled();
+  });
+
+  it("the thresholds are options", async () => {
+    expect((await press("mouse", 3, 0, { panThreshold: { mouse: 2 } })).pan).toEqual({ x: 3, y: 0 });
+    expect((await press("touch", 12, 0, { panThreshold: { touch: 16 } })).onButton).toHaveBeenCalledTimes(1);
+  });
+
+  it("pinch is unaffected: a small pinch still zooms", async () => {
+    const { h, svg } = await renderChart();
+    await act(async () => {
+      svg.dispatchEvent(touch("touchstart", [[150, 400], [250, 400]]));
+      svg.dispatchEvent(touch("touchmove", [[146, 400], [254, 400]])); // fingers moved 4 px each
+    });
+    expect(h.current.pz.scale).toBeCloseTo(1.08, 6);
+    await h.unmount();
+  });
+});
+
