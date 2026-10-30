@@ -8,8 +8,4 @@ export {
   outgoingX,
   outgoingY,
 } from "./connectionPoints";
-export {
-  buildView,
-  countDescendants,
-  clearDescendantCountCache,
-} from "./build";
+export { buildView, countDescendants } from "./build";

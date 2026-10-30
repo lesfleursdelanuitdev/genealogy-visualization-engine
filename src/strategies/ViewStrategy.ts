@@ -11,16 +11,19 @@ import type { PersonNode } from "../nodes";
 import type { DescendancyPerson } from "../types";
 import type { UnionRecord } from "../types";
 import type { UnionNode } from "../nodes";
+import type { GraphSnapshot } from "../graph";
 
 /** Context passed by the builder so the strategy can recurse and resolve data. */
 export interface BuildContext {
   buildNode(personId: string, depth: number, onlyRoot?: boolean): PersonNode | null;
+  /** The graph being built from; strategies read people and unions only from here. */
+  graph: GraphSnapshot;
   rootId: string;
   maxDepth: number;
-  people: Map<string, DescendancyPerson>;
+  people: ReadonlyMap<string, DescendancyPerson>;
   visited: Set<string>;
-  allUnionsFor(personId: string): UnionRecord[];
-  defaultChildrenOf(personId: string): string[];
+  allUnionsFor(personId: string): readonly UnionRecord[];
+  defaultChildrenOf(personId: string): readonly string[];
 }
 
 /**

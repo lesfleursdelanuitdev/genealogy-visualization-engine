@@ -18,9 +18,9 @@ import {
 } from "../helpers/graph";
 
 describe("H3: descendancy build cost", () => {
-  knownBug(
-    "H3",
-    "builds 6,826 people with every partner revealed in under 300 ms (linear, not quadratic)",
+  // Fixed by the GraphSnapshot refactor (indexes built once, not copied per person).
+  it(
+    "[H3 fixed] builds 6,826 people with every partner revealed in under 300 ms (linear, not quadratic)",
     () => {
       const { fixture, revealedUnions } = wideFamily(4, 6);
       expect(fixture.people.length).toBe(6826);

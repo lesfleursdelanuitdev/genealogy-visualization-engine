@@ -3,7 +3,7 @@
  *
  * Traversal is top-down (root → children). The strategy decides, per person,
  * whether to attach union nodes (e.g. spouse rows) or default children.
- * Data source is the current builder (getPeople, getUnionsByPerson, getAllChildrenOf).
+ * The only data source is the GraphSnapshot passed in `options.graph`.
  *
  * Descendancy-specific pieces (countDescendants, buildView) live in strategies/descendancy.
  */
@@ -11,10 +11,11 @@
 import type { ChartNode } from "../nodes";
 import type { ViewStrategy } from "../strategies/ViewStrategy";
 import { PersonNode } from "../nodes";
-import { getPeople, getUnionsByPerson, getAllChildrenOf } from "../testdata";
-import type { UnionRecord } from "../types";
+import type { GraphSnapshot } from "../graph";
 
 export interface BuildTreeOptions {
+  /** People and unions to build from. Nothing else is read. */
+  graph: GraphSnapshot;
   maxDepth: number;
   /** Optional: at max depth, set PersonNode._hiddenCount (e.g. for +N badge). Descendancy provides countDescendants. */
   getHiddenCount?: (personId: string) => number;
@@ -35,24 +36,19 @@ export function buildTree(
   strategy: ViewStrategy,
   options: BuildTreeOptions
 ): BuildTreeResult {
-  const people = getPeople();
+  const { graph, maxDepth, getHiddenCount } = options;
+  const people = graph.people;
   const visited = new Set<string>();
-  const { maxDepth, getHiddenCount } = options;
   const maxDepthRendered = { current: 0 };
 
-  const allUnionsFor = (personId: string): UnionRecord[] =>
-    getUnionsByPerson().get(personId) ?? [];
-
-  const defaultChildrenOf = (personId: string): string[] =>
-    getAllChildrenOf(personId);
-
   const ctx = {
+    graph,
     rootId,
     maxDepth,
     people,
     visited,
-    allUnionsFor,
-    defaultChildrenOf,
+    allUnionsFor: (personId: string) => graph.unionsOf(personId),
+    defaultChildrenOf: (personId: string) => graph.childrenOf(personId),
     maxDepthRendered,
     buildNode(personId: string, depth: number, onlyRoot = false): PersonNode | null {
       if (depth > maxDepthRendered.current) maxDepthRendered.current = depth;
@@ -80,7 +76,7 @@ export function buildTree(
 
       const unionNodes = strategy.buildUnionNodes(personId, depth, ctx);
       if (unionNodes.length === 0) {
-        const childIds = defaultChildrenOf(personId);
+        const childIds = graph.childrenOf(personId);
         const children = childIds
           .map((id) => this.buildNode(id, depth + 1))
           .filter((n): n is PersonNode => n != null);

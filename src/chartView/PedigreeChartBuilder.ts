@@ -53,8 +53,8 @@ export class PedigreeChartBuilder implements ChartViewBuildAdapter {
   }
 
   buildTreeResult(rootId: string, viewState: ViewState, maxDepth: number): BuildTreeResult {
-    const people = this.dataBuilder.getPeople();
-    const birthByChild = this.dataBuilder.getBirthUnionByChild();
+    const people = this.dataBuilder.snapshot.people;
+    const birthByChild = this.dataBuilder.snapshot.birthUnionByChild;
     const effectiveDepth = viewState.currentDepth ?? maxDepth;
     const collapseAbovePersonId = (viewState.pedigreeAncestorCollapsePersonId ?? "").trim() || null;
 

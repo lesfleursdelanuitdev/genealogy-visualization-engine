@@ -13,13 +13,13 @@ import {
   SiblingAdoptiveUnionNode,
   type UnionNode,
 } from "../../nodes";
-import { getParentUnionsByChild, getUnionById, getUnionsByPerson } from "../../testdata";
 import type { ViewState, LinkedUnionEntry, UnionRecord } from "../../types";
+import type { GraphSnapshot } from "../../graph";
 import { shouldSkipCatchAllForFamilyUnit } from "../../reducer/strategies/descendancy/familyUnitScope";
 import type { BuildContext, ViewStrategy } from "../ViewStrategy";
 
 function resolveUnionBetweenPartners(
-  allUnions: UnionRecord[],
+  allUnions: readonly UnionRecord[],
   personId: string,
   spouseId: string,
   familyXref?: string | null
@@ -59,7 +59,7 @@ export class DescendancyViewStrategy implements ViewStrategy {
     if (spouseIds.length === 0) return [];
 
     const xyScoped = this.buildXYLinkedNodesForPerson(
-      people,
+      ctx.graph,
       linkedUnions,
       personId,
       ctx.rootId,
@@ -127,7 +127,7 @@ export class DescendancyViewStrategy implements ViewStrategy {
 
   private buildLinkedUnionNodes(
     spouseId: string,
-    people: Map<string, DescendancyPerson>,
+    people: ReadonlyMap<string, DescendancyPerson>,
     linkedUnions: Map<string, LinkedUnionEntry[]>
   ): UnionNode[] {
     const linked = linkedUnions.get(spouseId) ?? [];
@@ -154,8 +154,9 @@ export class DescendancyViewStrategy implements ViewStrategy {
    * Primary parent on the birth union for `anchorId` (same rule as applyParents re-root).
    * Used to attach `__xy__` adoptive rows next to that parent's spouse line when the anchor has no spouses revealed.
    */
-  private xyAttachmentParentId(anchorId: string, people: Map<string, DescendancyPerson>): string | null {
-    const parentUnions = getParentUnionsByChild().get(anchorId) ?? [];
+  private xyAttachmentParentId(anchorId: string, graph: GraphSnapshot): string | null {
+    const people = graph.people;
+    const parentUnions = graph.parentUnionsOf(anchorId);
     if (parentUnions.length === 0) return null;
     const birthUnion =
       parentUnions.find((u) => u.children.find((c) => c.id === anchorId)?.pedi === "birth") ??
@@ -172,12 +173,13 @@ export class DescendancyViewStrategy implements ViewStrategy {
    * Sibling-view adoptive couples use {@link buildSiblingViewNodes} / {@link SiblingAdoptiveUnionNode}, not this path.
    */
   private buildXYLinkedNodesForPerson(
-    people: Map<string, DescendancyPerson>,
+    graph: GraphSnapshot,
     linkedUnions: Map<string, LinkedUnionEntry[]>,
     personId: string,
     rootId: string,
     revealedUnions: Map<string, string[]>
   ): UnionNode[] {
+    const people = graph.people;
     const nodes: UnionNode[] = [];
     for (const [key, entries] of linkedUnions) {
       if (!key.startsWith("__xy__")) continue;
@@ -188,7 +190,7 @@ export class DescendancyViewStrategy implements ViewStrategy {
           if (anchorSpouses.length > 0) {
             if (personId !== anchor) continue;
           } else {
-            const attachTo = this.xyAttachmentParentId(anchor, people);
+            const attachTo = this.xyAttachmentParentId(anchor, graph);
             if (attachTo == null || personId !== attachTo) continue;
           }
         } else if (personId !== rootId) {
@@ -209,7 +211,7 @@ export class DescendancyViewStrategy implements ViewStrategy {
 
   private buildCatchAllNode(
     person: DescendancyPerson,
-    allUnions: UnionRecord[],
+    allUnions: readonly UnionRecord[],
     revealedUnionIds: Set<string>,
     depth: number,
     ctx: BuildContext
@@ -236,7 +238,7 @@ export class DescendancyViewStrategy implements ViewStrategy {
     depth: number,
     ctx: BuildContext
   ): CatchAllNode | null {
-    const catchUnions = getUnionsByPerson().get(catchPersonId) ?? [];
+    const catchUnions = ctx.graph.unionsOf(catchPersonId);
     const filtered = excludeUnionId
       ? catchUnions.filter((u) => (u.id ?? `${u.husb}-${u.wife}`) !== excludeUnionId)
       : catchUnions;
@@ -262,7 +264,7 @@ export class DescendancyViewStrategy implements ViewStrategy {
   private buildSiblingViewNodes(
     personId: string,
     revealedUnionNodes: UnionNode[],
-    allUnions: UnionRecord[],
+    allUnions: readonly UnionRecord[],
     depth: number,
     ctx: BuildContext
   ): UnionNode[] {
@@ -300,7 +302,7 @@ export class DescendancyViewStrategy implements ViewStrategy {
       if (node) nodes.push(node);
     }
     for (const unionId of siblingView.adoptiveUnions ?? []) {
-      const adoptUnion = getUnionById().get(unionId);
+      const adoptUnion = ctx.graph.unionById.get(unionId);
       if (!adoptUnion) continue;
       const childNodes = adoptUnion.children
         .filter((c) => c.id !== siblingView.personId)

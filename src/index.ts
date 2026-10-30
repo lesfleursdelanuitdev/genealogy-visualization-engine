@@ -36,6 +36,15 @@ export {
 } from "./strategies/descendancy";
 
 export type { DescendancyPerson } from "./types";
+export {
+  createGraphSnapshot,
+  unionIdOf,
+  EMPTY_GRAPH,
+  type GraphInput,
+  type GraphSnapshot,
+  type SnapshotUnion,
+  type SpouseLink,
+} from "./graph";
 
 export {
   Node,
@@ -58,11 +67,7 @@ export { collectAll, collectAllPersonNodes, getMaxDepth, findUnionContainingPers
 export { layout, markUnions, isContainer } from "./strategies/descendancy";
 export { DEFAULT_PEDIGREE_PARENT_PAIR_GAP, DEFAULT_PEDIGREE_GENERATION_GAP } from "./strategies/pedigree/pedigreeLayout";
 
-export {
-  buildView,
-  countDescendants,
-  clearDescendantCountCache,
-} from "./strategies/descendancy";
+export { buildView, countDescendants } from "./strategies/descendancy";
 export type { ViewStrategy, BuildContext } from "./strategies/ViewStrategy";
 export { DescendancyViewStrategy, PedigreeViewStrategy } from "./strategies";
 

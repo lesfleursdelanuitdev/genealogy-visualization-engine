@@ -29,7 +29,7 @@ export const descendancyDescriptor: ViewStrategyDescriptor = {
     );
   },
 
-  getHiddenCount: countDescendants,
+  getHiddenCount: (graph, personId) => countDescendants(graph, personId),
 
   layout,
 

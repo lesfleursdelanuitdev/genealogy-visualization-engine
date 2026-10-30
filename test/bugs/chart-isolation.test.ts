@@ -6,15 +6,18 @@
  * build reads the people through the module-level "current builder", which now holds the
  * modal's graph.
  */
-import { describe, expect } from "vitest";
+import { describe, it, expect } from "vitest";
 import { knownBug } from "../helpers/bugs";
 import { person, union } from "../helpers/graph";
 import {
   FamilyTreeBuilder,
   DescendancyChartAdapter,
   setCurrentBuilder,
+  treeReducer,
   PersonNode,
   UnionNode,
+  type TreeState,
+  type ViewState,
 } from "../../src";
 
 const profileGraph = {
@@ -27,7 +30,8 @@ const modalGraph = {
 };
 
 describe("H1: charts share one global builder", () => {
-  knownBug("H1", "a second chart loading does not change what the first chart builds", () => {
+  // Builds were fixed by the GraphSnapshot refactor: an adapter builds from its own snapshot.
+  it("[H1 fixed for builds] a second chart loading does not change what the first chart builds", () => {
     const profileData = new FamilyTreeBuilder(profileGraph);
     setCurrentBuilder(profileData); // what useChartViewFetch does when the profile chart loads
     const profileChart = new DescendancyChartAdapter(profileData);
@@ -45,5 +49,22 @@ describe("H1: charts share one global builder", () => {
     const unionNode = root.children[0];
     expect(unionNode).toBeInstanceOf(UnionNode);
     expect((unionNode as UnionNode).children.map((c) => (c as PersonNode).content.id)).toEqual(["@A3@"]);
+  });
+
+  knownBug("H1", "a second chart loading does not change what the first chart's reducer sees", () => {
+    const profileData = new FamilyTreeBuilder(profileGraph);
+    setCurrentBuilder(profileData);
+    const state: TreeState = {
+      strategyName: "descendancy",
+      rootId: "@A1@",
+      viewState: {},
+      history: [{ rootId: "@A1@", viewState: {}, strategyName: "descendancy" }],
+      historyIndex: 0,
+    };
+
+    setCurrentBuilder(new FamilyTreeBuilder(modalGraph)); // the modal chart loads
+
+    const next = treeReducer(state, { type: "REVEAL_ALL_SPOUSES" });
+    expect((next.viewState as ViewState).revealedUnions?.get("@A1@")).toEqual(["@A2@"]);
   });
 });

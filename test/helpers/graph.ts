@@ -7,7 +7,6 @@
 import {
   FamilyTreeBuilder,
   setCurrentBuilder,
-  clearDescendantCountCache,
   countDescendants,
   DescendancyChartAdapter,
   PedigreeChartBuilder,
@@ -66,7 +65,6 @@ export function buildDescendancy(
   maxDepth = 6
 ): BuildTreeResult {
   setCurrentBuilder(g);
-  clearDescendantCountCache();
   return new DescendancyChartAdapter(g).buildTreeResult(rootId, viewState, maxDepth);
 }
 
@@ -88,9 +86,7 @@ export function reduce(g: Graph, state: TreeState, action: TreeAction): TreeStat
 
 /** "+N hidden descendants" counter as one chart build sees it (one cache for all calls). */
 export function hiddenCounter(g: Graph): (personId: string) => number {
-  setCurrentBuilder(g);
-  clearDescendantCountCache();
-  return (personId) => countDescendants(personId);
+  return (personId) => countDescendants(g.snapshot, personId);
 }
 
 export function spousesOf(g: Graph, personId: string): { spouseId: string; union: UnionRecord }[] {

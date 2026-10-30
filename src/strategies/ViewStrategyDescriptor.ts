@@ -6,6 +6,7 @@
 import type { ChartNode } from "../nodes";
 import type { ViewStrategy } from "./ViewStrategy";
 import type { ViewState } from "../types";
+import type { GraphSnapshot } from "../graph";
 
 /** Options passed when creating a build strategy (matches FamilyTreeBuildOptions). */
 export interface BuildStrategyOptions {
@@ -75,7 +76,7 @@ export interface ViewStrategyDescriptor {
   createBuildStrategy(opts: BuildStrategyOptions): ViewStrategy;
 
   /** Optional: at max depth, return count for +N badge. */
-  getHiddenCount?: (personId: string) => number;
+  getHiddenCount?: (graph: GraphSnapshot, personId: string) => number;
 
   /** Assign x, y, _computedWidth to the tree. Called after build. */
   layout(root: ChartNode, options?: LayoutBoundsOptions): void;

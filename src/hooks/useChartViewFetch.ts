@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { clearCurrentBuilder, setCurrentBuilder, FamilyTreeBuilder } from "../builder";
-import { clearDescendantCountCache } from "../strategies/descendancy";
 import { DEFAULT_MAX_DEPTH } from "../constants";
 import type { DescendancyPerson } from "../types";
 import type { SiblingView } from "../types";
@@ -140,7 +139,6 @@ export function useChartViewFetch(
       strategyName === "descendancy" && Boolean(siblingViewPersonId?.trim());
     if (DEBUG_BUILDER) console.log("[FamilyTreeBuilder] Fetch started, clearing builder");
     clearCurrentBuilder();
-    clearDescendantCountCache();
     setChartAdapter(null);
     setPedigreeMultiFamilyChildXrefs([]);
     const tid = setTimeout(() => {
@@ -203,7 +201,6 @@ export function useChartViewFetch(
           setChartAdapter(adapter);
           setCurrentBuilder(treeBuilder);
           setLastApiRootId(data.rootId);
-          clearDescendantCountCache();
           setChartDataKey((k) => k + 1);
           setIsChartLoading(false);
         } finally {
@@ -219,7 +216,6 @@ export function useChartViewFetch(
         setChartAdapter(null);
         clearCurrentBuilder();
         setLastApiRootId(null);
-        clearDescendantCountCache();
         setPedigreeMultiFamilyChildXrefs([]);
         setChartDataKey((k) => k + 1);
         setIsChartLoading(false);
