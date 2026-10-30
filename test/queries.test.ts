@@ -33,9 +33,9 @@ const file = () =>
   });
 
 describe("parent families", () => {
-  it("birthFamilyOf and defaultFamc follow the one birth rule (T20)", () => {
+  it("birthFamilyOf follows the birth rule (T36); defaultFamc the ancestor charts' rule (T47)", () => {
     expect(birthFamilyOf(file(), "P")?.id).toBe("@FB@");
-    expect(defaultFamc(file(), "P")).toBe("@FB@");
+    expect(defaultFamc(file(), "P")).toBe("@FA@"); // adoptive first
     expect(defaultFamc(file(), "X")).toBeNull();
   });
 

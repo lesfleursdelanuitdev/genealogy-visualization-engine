@@ -63,6 +63,9 @@ export {
   countAncestors,
   countDescendantsWithin,
   parentFamilyToClimb,
+  ancestorFamilyOf,
+  parentFamilySwitch,
+  chosenParentFamilyId,
   birthFamilyOf,
   defaultFamc,
   parentFamiliesOf,
@@ -74,6 +77,7 @@ export {
   type AncestorClimbOptions,
   type ParentFamily,
   type ComputedSiblingView,
+  type ParentFamilySwitch,
 } from "./graph";
 
 export {
@@ -87,6 +91,7 @@ export {
   type ChartNode,
   type NodeType,
   type IUnionNode,
+  type PersonParentFamilies,
 } from "./nodes";
 
 export { visualHalfWidth, getBounds } from "./strategies/descendancy/bounds";

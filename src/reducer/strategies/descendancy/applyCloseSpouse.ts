@@ -26,13 +26,9 @@ export function applyCloseSpouse(
   if (filtered.length === 0) next.delete(personId);
   else next.set(personId, filtered);
 
-  // Clean up a phantom reverse entry spouseId→[personId] left by a prior REVEAL_ALL_SPOUSES.
-  const reverseList = next.get(spouseId);
-  if (reverseList) {
-    const reverseFiltered = reverseList.filter((id) => id !== personId);
-    if (reverseFiltered.length === 0) next.delete(spouseId);
-    else next.set(spouseId, reverseFiltered);
-  }
+  // The partner's own row (spouseId → [personId]) stays: it is real when both are principals
+  // (e.g. a father with a child by his daughter, T49), and REVEAL_ALL_SPOUSES no longer adds
+  // phantom reverse entries.
   const scope = v.familyUnitScope;
   const clearScope =
     scope != null && personId === scope.personId && (scope.spouseId === spouseId || filtered.length === 0);

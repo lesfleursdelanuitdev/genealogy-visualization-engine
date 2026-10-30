@@ -23,18 +23,8 @@ export function applyCloseAllSpousesForPerson(
 ): TreeState {
   const vs = state.viewState as ViewState;
   const nextRevealed = new Map(vs.revealedUnions ?? []);
-  // Capture spouses before deletion so we can clean up phantom reverse entries.
-  const formerSpouses = nextRevealed.get(personId) ?? [];
+  // Only this person's row closes (T19); partners' own rows stay (see applyCloseSpouse).
   nextRevealed.delete(personId);
-  // Clean up phantom Si→[personId] entries left by a prior REVEAL_ALL_SPOUSES.
-  for (const spouseId of formerSpouses) {
-    const reverseList = nextRevealed.get(spouseId);
-    if (reverseList) {
-      const reverseFiltered = reverseList.filter((id) => id !== personId);
-      if (reverseFiltered.length === 0) nextRevealed.delete(spouseId);
-      else nextRevealed.set(spouseId, reverseFiltered);
-    }
-  }
   const base =
     vs.familyUnitScope?.personId === personId ? withoutFamilyUnitScope(vs) : vs;
   const newViewState = { ...base, revealedUnions: nextRevealed };

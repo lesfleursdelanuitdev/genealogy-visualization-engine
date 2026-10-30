@@ -41,11 +41,15 @@ export const coreHandlers: Partial<Record<TreeAction["type"], Handler>> = {
     const { history, historyIndex } = a as Extract<TreeAction, { type: "RESTORE_HISTORY" }>;
     return applyRestoreHistory(s, history, historyIndex);
   },
-  PEDIGREE_SET_FAMC_FAMILY_XREF: (s, a) =>
-    applyPedigreeSetFamcFamilyXref(s, (a as Extract<TreeAction, { type: "PEDIGREE_SET_FAMC_FAMILY_XREF" }>).familyXref),
-  PEDIGREE_SET_FAMC_FOR_PERSON: (s, a) => {
+  PEDIGREE_SET_FAMC_FAMILY_XREF: (s, a, graph) =>
+    applyPedigreeSetFamcFamilyXref(
+      s,
+      (a as Extract<TreeAction, { type: "PEDIGREE_SET_FAMC_FAMILY_XREF" }>).familyXref,
+      graph
+    ),
+  PEDIGREE_SET_FAMC_FOR_PERSON: (s, a, graph) => {
     const x = a as Extract<TreeAction, { type: "PEDIGREE_SET_FAMC_FOR_PERSON" }>;
-    return applyPedigreeSetFamcForPerson(s, x.personId, x.familyXref);
+    return applyPedigreeSetFamcForPerson(s, x.personId, x.familyXref, graph);
   },
   PEDIGREE_COLLAPSE_ANCESTORS: (s, a, graph) =>
     applyPedigreeCollapseAncestors(

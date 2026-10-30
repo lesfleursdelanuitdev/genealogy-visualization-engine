@@ -10,7 +10,7 @@
 
 import type { ChartNode } from "../nodes";
 import type { ViewStrategy } from "../strategies/ViewStrategy";
-import { PersonNode } from "../nodes";
+import { PersonNode, NormalUnionNode } from "../nodes";
 import type { GraphSnapshot } from "../graph";
 
 export interface BuildTreeOptions {
@@ -125,6 +125,7 @@ export function buildTree(
   };
 
   const root = ctx.buildNode(rootId, 0);
+  if (root) shadowRepeatedPartners(root);
   if (!root) {
     const fallback = people.get(rootId);
     if (fallback) {
@@ -144,3 +145,32 @@ export function buildTree(
   }
   return { root, maxDepthRendered: maxDepthRendered.current };
 }
+
+/**
+ * T49: someone who appears more than once in a chart is a full card once and a shadow
+ * everywhere else. buildTree already makes a repeated *principal* (a person built with their
+ * own families) a shadow. Partner cards are fixed up here, after the build: a partner card is a
+ * shadow when that person is a principal anywhere in the chart (their families hang under the
+ * principal card, so that one stays full), or when they already appeared as a partner earlier
+ * in build order.
+ */
+function shadowRepeatedPartners(root: ChartNode): void {
+  const principals = new Set<string>();
+  const collect = (n: ChartNode): void => {
+    if (n instanceof PersonNode && n.content._isShadow !== true) principals.add(n.content.id);
+    for (const c of n.children) collect(c);
+  };
+  collect(root);
+
+  const partners = new Set<string>();
+  const mark = (n: ChartNode): void => {
+    if (n instanceof NormalUnionNode && n.right && n.right.content._isShadow !== true) {
+      const id = n.right.content.id;
+      if (principals.has(id) || partners.has(id)) n.right.content = { ...n.right.content, _isShadow: true };
+      else partners.add(id);
+    }
+    for (const c of n.children) mark(c);
+  };
+  mark(root);
+}
+

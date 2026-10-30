@@ -86,8 +86,8 @@ describe("ancestor counts", () => {
         union("@FZ@", "Z", "", ["A1"]),
       ],
     });
-    expect(countAncestors(g, "C")).toBe(2);
-    expect(countAncestors(g, "C", { famcOverrides: { C: "@FA@" } })).toBe(3); // A1, A2, Z
+    expect(countAncestors(g, "C")).toBe(3); // adoptive family first (T47): A1, A2, Z
+    expect(countAncestors(g, "C", { famcOverrides: { C: "@FB@" } })).toBe(2); // B1, B2
   });
 });
 

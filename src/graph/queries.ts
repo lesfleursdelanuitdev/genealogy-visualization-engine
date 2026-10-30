@@ -17,8 +17,20 @@ export interface AncestorClimbOptions {
 }
 
 /**
+ * The ancestor charts' default parent family (T47, amends T20/T36): the first family, in FAMC
+ * order, where the person's pedi is "adopted"; else the birth family (first "birth" family,
+ * else the first listed).
+ */
+export function ancestorFamilyOf(graph: GraphSnapshot, personId: string): SnapshotUnion | undefined {
+  const adopted = graph
+    .parentUnionsOf(personId)
+    .find((u) => u.children.some((c) => c.id === personId && c.pedi === "adopted"));
+  return adopted ?? graph.birthUnionByChild.get(personId);
+}
+
+/**
  * The family the ancestor charts climb from `personId`: a chosen family when it lists the
- * person as a child, otherwise the birth family (T20).
+ * person as a child, otherwise the default (adoptive first, T47).
  */
 export function parentFamilyToClimb(
   graph: GraphSnapshot,
@@ -27,7 +39,39 @@ export function parentFamilyToClimb(
 ): SnapshotUnion | undefined {
   const chosen = chosenFamilyId ? graph.unionById.get(chosenFamilyId) : undefined;
   if (chosen && chosen.children.some((c) => c.id === personId)) return chosen;
-  return graph.birthUnionByChild.get(personId);
+  return ancestorFamilyOf(graph, personId);
+}
+
+/** What a card needs for its "2 families" switch (T45, T47). */
+export interface ParentFamilySwitch {
+  /** Every parent family, in FAMC order, with the person's pedi in it. */
+  families: Array<{ familyId: string; kind: string }>;
+  /** The family the ancestor chart shows now. */
+  shownFamilyId: string | null;
+}
+
+/** The family chosen for `personId` in an ancestor chart's view state (root: pedigreeFamcFamilyXref). */
+export function chosenParentFamilyId(
+  viewState: { pedigreeFamcFamilyXref?: string | null; pedigreeFamcOverrides?: Readonly<Record<string, string>> },
+  personId: string,
+  isRoot: boolean
+): string | null {
+  const root = isRoot ? (viewState.pedigreeFamcFamilyXref ?? "").trim() || null : null;
+  return root ?? viewState.pedigreeFamcOverrides?.[personId] ?? null;
+}
+
+export function parentFamilySwitch(
+  graph: GraphSnapshot,
+  personId: string,
+  viewState: { pedigreeFamcFamilyXref?: string | null; pedigreeFamcOverrides?: Readonly<Record<string, string>> },
+  options: { isRoot: boolean }
+): ParentFamilySwitch {
+  const families = graph.parentUnionsOf(personId).map((u) => ({
+    familyId: u.id,
+    kind: u.children.find((c) => c.id === personId)?.pedi ?? "birth",
+  }));
+  const shown = parentFamilyToClimb(graph, personId, chosenParentFamilyId(viewState, personId, options.isRoot));
+  return { families, shownFamilyId: shown?.id ?? null };
 }
 
 /** Known parents (no unknown placeholders) of a family. */
@@ -85,9 +129,9 @@ export function birthFamilyOf(graph: GraphSnapshot, personId: string): SnapshotU
   return graph.birthUnionByChild.get(personId);
 }
 
-/** The family an ancestor chart starts from when the user hasn't chosen one. */
+/** The family an ancestor chart shows when the user hasn't chosen one (adoptive first, T47). */
 export function defaultFamc(graph: GraphSnapshot, personId: string): string | null {
-  return birthFamilyOf(graph, personId)?.id ?? null;
+  return ancestorFamilyOf(graph, personId)?.id ?? null;
 }
 
 export interface ParentFamily {

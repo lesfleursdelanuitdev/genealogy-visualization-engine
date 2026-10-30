@@ -25,6 +25,8 @@ import {
 export interface GraphFixture {
   people: DescendancyPerson[];
   unions: UnionRecord[];
+  /** Each person's FAMC order (GraphInput.famcOrder). */
+  famcOrder?: ReadonlyMap<string, readonly string[]>;
 }
 
 /** Opaque handle to a loaded graph; what it is depends on the engine API under test. */

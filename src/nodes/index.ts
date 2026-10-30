@@ -5,7 +5,7 @@
 
 export type { ChartNode, IUnionNode, NodeType } from "./types";
 export { Node } from "./Node";
-export { PersonNode } from "./PersonNode";
+export { PersonNode, type PersonParentFamilies } from "./PersonNode";
 export { UnionNode } from "./UnionNode";
 export { NormalUnionNode } from "./NormalUnionNode";
 export { CatchAllNode } from "./CatchAllNode";

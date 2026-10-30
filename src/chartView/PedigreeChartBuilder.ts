@@ -7,7 +7,7 @@ import type { DescendancyPerson } from "../types";
 import { PersonNode, NormalUnionNode } from "../nodes";
 import type { ChartNode } from "../nodes";
 import type { ChartViewBuildAdapter } from "./ChartViewBuildAdapter";
-import { countAncestors, parentFamilyToClimb } from "../graph/queries";
+import { chosenParentFamilyId, countAncestors, parentFamilyToClimb } from "../graph/queries";
 
 function maxRenderedDepth(node: ChartNode, d = 0): number {
   let m = d;
@@ -59,15 +59,18 @@ export class PedigreeChartBuilder implements ChartViewBuildAdapter {
     const collapseAbovePersonId = (viewState.pedigreeAncestorCollapsePersonId ?? "").trim() || null;
     const showParentsOf = new Set(viewState.showParentsOf ?? []);
 
-    /** B13: the root's chosen family, or an ancestor's chosen family, else the birth family (T20). */
-    const chosenFamilyFor = (id: string, gen: number) =>
-      (gen === 0 ? rootFamc ?? famcOverrides[id] : famcOverrides[id]) ?? null;
+    /** B13: the root's chosen family, or an ancestor's chosen family; else the default (T47). */
+    const chosenFamilyFor = (id: string, gen: number) => chosenParentFamilyId(viewState, id, gen === 0);
 
     /** T30: distinct ancestors hidden above a card, along the same families the chart climbs. */
     const hiddenAncestors = (id: string, gen: number) =>
       countAncestors(graph, id, { famcOverrides, firstFamilyId: gen === 0 ? rootFamc : null });
 
-    const visiting = new Set<string>();
+    /**
+     * T49: everyone is drawn in full once, the first time in build order (father's side first);
+     * any later appearance (pedigree collapse, or a cycle) is a shadow with nothing above it.
+     */
+    const drawn = new Set<string>();
 
     const makeUnknown = (id: string): DescendancyPerson => ({
       id,
@@ -89,27 +92,41 @@ export class PedigreeChartBuilder implements ChartViewBuildAdapter {
      * its parents, unless its chip was tapped (showParentsOf): then its parents appear, one row.
      */
     const buildPerson = (id: string, gen: number, cap: number): PersonNode => {
-      if (visiting.has(id)) {
+      if (drawn.has(id)) {
         const p = people.get(id) ?? makeUnknown(id);
         return new PersonNode({ ...p, _isShadow: true }, []);
       }
+      drawn.add(id);
       const raw = { ...(people.get(id) ?? makeUnknown(id)), _onlyRoot: gen === 0 };
+      const node = (content: DescendancyPerson, children: ChartNode[]) => {
+        const n = new PersonNode(content, children);
+        const families = graph.parentUnionsOf(id);
+        if (families.length > 1) {
+          n.parentFamilies = {
+            families: families.map((u) => ({
+              familyId: u.id,
+              kind: u.children.find((c) => c.id === id)?.pedi ?? "birth",
+            })),
+            shownFamilyId: parentFamilyToClimb(graph, id, chosenFamilyFor(id, gen))?.id ?? null,
+          };
+        }
+        return n;
+      };
       const stopsHere = gen >= cap || (collapseAbovePersonId != null && id === collapseAbovePersonId);
       let parentCap = cap;
       if (stopsHere) {
-        if (!showParentsOf.has(id)) return new PersonNode({ ...raw, _hiddenCount: hiddenAncestors(id, gen) }, []);
+        if (!showParentsOf.has(id)) return node({ ...raw, _hiddenCount: hiddenAncestors(id, gen) }, []);
         parentCap = gen + 1;
       }
       const u = parentFamilyToClimb(graph, id, chosenFamilyFor(id, gen));
-      if (!u) return new PersonNode(raw, []);
+      if (!u) return node(raw, []);
 
       // A per-family placeholder partner (H4) counts as a missing parent here.
       const h = known(u.husb);
       const w = known(u.wife);
-      if (!h && !w) return new PersonNode(raw, []);
+      if (!h && !w) return node(raw, []);
 
-      visiting.add(id);
-      try {
+      {
         let leftNode: PersonNode;
         let rightNode: PersonNode;
 
@@ -128,9 +145,7 @@ export class PedigreeChartBuilder implements ChartViewBuildAdapter {
         }
 
         const union = new NormalUnionNode(leftNode, rightNode, [], id);
-        return new PersonNode(raw, [union]);
-      } finally {
-        visiting.delete(id);
+        return node(raw, [union]);
       }
     };
 

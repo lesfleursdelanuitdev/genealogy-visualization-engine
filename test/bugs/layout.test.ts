@@ -109,14 +109,15 @@ describe("B13: chosen parent family in the pedigree", () => {
     return [u.left.content.id, u.right?.content.id];
   }
 
-  it("climbs the birth family by default", () => {
+  // T47 (2026-10-30) changed the default from the birth family to the adoptive family.
+  it("climbs the adoptive family by default (T47)", () => {
     const { root } = buildPedigree(adopted(), "C");
-    expect(parentsOf(root as PersonNode)).toEqual(["P1", "P2"]);
+    expect(parentsOf(root as PersonNode)).toEqual(["A1", "A2"]);
   });
 
   it("[B13 fixed] pedigreeFamcFamilyXref picks the root's parent family", () => {
-    const { root } = buildPedigree(adopted(), "C", { pedigreeFamcFamilyXref: "@FA@" });
-    expect(parentsOf(root as PersonNode)).toEqual(["A1", "A2"]);
+    const { root } = buildPedigree(adopted(), "C", { pedigreeFamcFamilyXref: "@FB@" });
+    expect(parentsOf(root as PersonNode)).toEqual(["P1", "P2"]);
   });
 
   it("[B13 fixed] pedigreeFamcOverrides picks an ancestor's parent family", () => {
@@ -129,8 +130,8 @@ describe("B13: chosen parent family in the pedigree", () => {
         union("@FA@", "A1", "A2", [{ id: "C", pedi: "adopted" }]),
       ],
     });
-    const { root } = buildPedigree(g, "R", { pedigreeFamcOverrides: { C: "@FA@" } });
+    const { root } = buildPedigree(g, "R", { pedigreeFamcOverrides: { C: "@FB@" } });
     const father = (root.children[0] as NormalUnionNode).left;
-    expect(parentsOf(father)).toEqual(["A1", "A2"]);
+    expect(parentsOf(father)).toEqual(["P1", "P2"]);
   });
 });

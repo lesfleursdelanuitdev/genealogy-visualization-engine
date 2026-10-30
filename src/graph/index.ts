@@ -14,6 +14,9 @@ export {
   countAncestors,
   countDescendantsWithin,
   parentFamilyToClimb,
+  ancestorFamilyOf,
+  parentFamilySwitch,
+  chosenParentFamilyId,
   birthFamilyOf,
   defaultFamc,
   parentFamiliesOf,
@@ -25,4 +28,5 @@ export {
   type AncestorClimbOptions,
   type ParentFamily,
   type ComputedSiblingView,
+  type ParentFamilySwitch,
 } from "./queries";
