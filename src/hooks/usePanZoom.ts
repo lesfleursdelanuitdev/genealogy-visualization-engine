@@ -16,6 +16,24 @@ const ZOOM_STEP = 1.2;
 const INITIAL_SCALE = 0.72;
 /** Vertical offset for root when applying initial view and fit-to-screen. */
 const INITIAL_TOP_PADDING = 110;
+/** A press becomes a pan only after moving this far (px), so taps with finger jitter stay taps. */
+const PAN_THRESHOLD_PX = 4;
+/** Targets that must keep their own press, focus and click: card buttons, links, fields. */
+const INTERACTIVE_SELECTOR =
+  'button, a[href], input, select, textarea, label, [role="button"], [data-chart-interactive]';
+
+function isInteractive(target: EventTarget | null): boolean {
+  return typeof Element !== "undefined" && target instanceof Element && target.closest(INTERACTIVE_SELECTOR) != null;
+}
+
+interface DragState {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  startPan: { x: number; y: number };
+  target: Element;
+  panning: boolean;
+}
 
 export interface UsePanZoomOptions {
   svgRef: React.RefObject<SVGSVGElement | null>;
@@ -53,8 +71,10 @@ export function usePanZoom({
   const [pan, setPanState] = useState({ x: 0, y: 0 });
   const [scale, setScaleState] = useState(INITIAL_SCALE);
   const [dragging, setDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [panAtDrag, setPanAtDrag] = useState({ x: 0, y: 0 });
+  /** The press in progress (one pointer). In a ref: fast events must not see stale state. */
+  const dragRef = useRef<DragState | null>(null);
+  /** Set when a pan ends: the click the browser sends next is part of the pan, not a tap. */
+  const suppressClickRef = useRef(false);
   const hasSetInitialView = useRef(false);
   const boundsRef = useRef(bounds);
   const baseRef = useRef({ x: baseX, y: baseY });
@@ -64,6 +84,7 @@ export function usePanZoom({
   const pinchStartDistRef = useRef<number | null>(null);
   const pinchStartScaleRef = useRef(INITIAL_SCALE);
   const pinchStartPanRef = useRef({ x: 0, y: 0 });
+  const pinchStartCenterRef = useRef({ x: 0, y: 0 });
   /** Tracks the element + pointer ID for the captured single-finger pointer so it can be released when a pinch starts. */
   const capturedPointerRef = useRef<{ el: Element; id: number } | null>(null);
   // Refs follow every change at once, so several wheel or touch events between two renders
@@ -213,38 +234,54 @@ export function usePanZoom({
     setPan(view.pan);
   }, [svgRef, bounds, fitView, setPan, setScale]);
 
-  const onPointerDown = useCallback(
-    (e: React.PointerEvent) => {
-      if (e.button !== 0) return;
-      if (isPinchingRef.current) return;
-      e.preventDefault();
-      const capturedEl = e.target as HTMLElement;
-      capturedEl.setPointerCapture(e.pointerId);
-      capturedPointerRef.current = { el: capturedEl, id: e.pointerId };
-      setDragging(true);
-      setDragStart({ x: e.clientX, y: e.clientY });
-      setPanAtDrag(pan);
-    },
-    [pan]
-  );
+  /**
+   * One-pointer pan (T31). A press on a card button, link or field keeps its default (focus,
+   * :active) and stays a tap unless the pointer moves past PAN_THRESHOLD_PX; the pointer is
+   * captured only once a pan starts, so a tap's pointerup and click land on the button.
+   */
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 0 || isPinchingRef.current) return;
+    suppressClickRef.current = false;
+    // Elsewhere, stop text selection and native image drag from starting.
+    if (!isInteractive(e.target)) e.preventDefault();
+    dragRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      startPan: { ...panRef.current },
+      target: e.target as Element,
+      panning: false,
+    };
+  }, []);
 
   const onPointerMove = useCallback(
     (e: React.PointerEvent) => {
-      if (isPinchingRef.current || !dragging) return;
+      const d = dragRef.current;
+      if (!d || isPinchingRef.current || e.pointerId !== d.pointerId) return;
+      const dx = e.clientX - d.startX;
+      const dy = e.clientY - d.startY;
+      if (!d.panning) {
+        if (Math.hypot(dx, dy) < PAN_THRESHOLD_PX) return;
+        d.panning = true;
+        d.target.setPointerCapture?.(d.pointerId);
+        capturedPointerRef.current = { el: d.target, id: d.pointerId };
+        setDragging(true);
+      }
       e.preventDefault();
-      setPan({ x: panAtDrag.x + (e.clientX - dragStart.x), y: panAtDrag.y + (e.clientY - dragStart.y) });
+      setPan({ x: d.startPan.x + dx, y: d.startPan.y + dy });
     },
-    [dragging, panAtDrag, dragStart, setPan]
+    [setPan]
   );
 
   const onPointerUp = useCallback((e: React.PointerEvent) => {
-    const el = e.target as HTMLElement;
-    if (el.hasPointerCapture?.(e.pointerId)) {
-      el.releasePointerCapture(e.pointerId);
+    const d = dragRef.current;
+    if (d && e.pointerId === d.pointerId) {
+      if (d.panning) suppressClickRef.current = true;
+      dragRef.current = null;
     }
-    if (capturedPointerRef.current?.id === e.pointerId) {
-      capturedPointerRef.current = null;
-    }
+    const el = e.target as Element;
+    if (el.hasPointerCapture?.(e.pointerId)) el.releasePointerCapture?.(e.pointerId);
+    if (capturedPointerRef.current?.id === e.pointerId) capturedPointerRef.current = null;
     setDragging(false);
   }, []);
 
@@ -273,6 +310,7 @@ export function usePanZoom({
       // Non-passive, so iOS Safari doesn't claim the pinch for its own page zoom.
       e.preventDefault();
       isPinchingRef.current = true;
+      dragRef.current = null; // a pinch ends any one-finger pan
       setDragging(false);
       if (capturedPointerRef.current) {
         const { el: captured, id } = capturedPointerRef.current;
@@ -280,6 +318,7 @@ export function usePanZoom({
         capturedPointerRef.current = null;
       }
       pinchStartDistRef.current = getDist(e.touches[0], e.touches[1]);
+      pinchStartCenterRef.current = getCenter(e.touches[0], e.touches[1]);
       pinchStartScaleRef.current = scaleRef.current;
       pinchStartPanRef.current = { ...panRef.current };
     };
@@ -291,7 +330,15 @@ export function usePanZoom({
       const startScale = pinchStartScaleRef.current;
       const factor = getDist(e.touches[0], e.touches[1]) / pinchStartDistRef.current;
       const ns = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, startScale * factor));
-      zoomAround(center.x, center.y, startScale, ns, pinchStartPanRef.current);
+      // The layout point that was under the fingers' first midpoint follows the midpoint now:
+      // pinch zooms around it and moving both fingers pans (T31).
+      const start = pinchStartCenterRef.current;
+      const startPan = pinchStartPanRef.current;
+      const b = baseRef.current;
+      const lx = (start.x - b.x - startPan.x) / startScale;
+      const ly = (start.y - b.y - startPan.y) / startScale;
+      setPan({ x: center.x - b.x - lx * ns, y: center.y - b.y - ly * ns });
+      setScale(ns);
     };
 
     const onTouchEnd = (e: TouchEvent) => {
@@ -301,12 +348,28 @@ export function usePanZoom({
       }
     };
 
+    // A click right after a pan is the end of the pan, not a tap: stop it before it reaches
+    // the card (capture phase). Keyboard clicks (detail 0) always pass.
+    const onClickCapture = (e: MouseEvent) => {
+      if (!suppressClickRef.current || e.detail === 0) return;
+      suppressClickRef.current = false;
+      e.stopPropagation();
+      e.preventDefault();
+    };
+
+    // The browser must not scroll or zoom the page from gestures on the chart (T31).
+    const previousTouchAction = el.style.touchAction;
+    el.style.touchAction = "none";
+
+    el.addEventListener("click", onClickCapture, true);
     el.addEventListener("wheel", onWheel, { passive: false });
     el.addEventListener("touchstart", onTouchStart, { passive: false });
     el.addEventListener("touchmove", onTouchMove, { passive: false });
     el.addEventListener("touchend", onTouchEnd, { passive: true });
     el.addEventListener("touchcancel", onTouchEnd, { passive: true });
     return () => {
+      el.style.touchAction = previousTouchAction;
+      el.removeEventListener("click", onClickCapture, true);
       el.removeEventListener("wheel", onWheel);
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchmove", onTouchMove);
